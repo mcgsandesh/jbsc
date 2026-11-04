@@ -14,46 +14,49 @@ import {
 
 export default function Home() {
   // षट् क्रिकेट-सङ्घाः
+
+  const base = import.meta.env.BASE_URL;
+
   const cricketTeams = [
     {
       name: "लोहगड लायन्स",
       subtitle: "Lohagad Lions",
-      img: "/teams/lohagad-lions.jpg",
+      img: `${base}teams/lohagad-lions.jpg`, // jar file capital asel tar exact naav taka, e.g. Lohagad-Lions.jpg
       tag: "शौर्य आणि ताकद",
       border: "border-amber-400/40"
     },
     {
       name: "तोरणा टायटन्स",
       subtitle: "Torna Titans",
-      img: "/teams/torna-titans.jpg",
+      img: `${base}teams/torna-titans.jpg`,
       tag: "पहिला विजय",
       border: "border-red-400/40"
     },
     {
       name: "शिवनेरी शिलेदार",
       subtitle: "Shivneri Shiledar",
-      img: "/teams/shivneri-shiledar.jpg",
+      img: `${base}teams/shivneri-shiledar.jpg`,
       tag: "जन्मभूमीचा स्वाभिमान",
       border: "border-orange-400/40"
     },
     {
       name: "कोंढाणा पलटण",
       subtitle: "Kondhana Paltan",
-      img: "/teams/kondhana-paltan.jpg",
+      img: `${base}teams/kondhana-paltan.jpg`,
       tag: "अजिंक्य योद्धा",
       border: "border-yellow-400/40"
     },
     {
       name: "रायगड रॉयल्स",
       subtitle: "Raygad Royals",
-      img: "/teams/raygad-royals.jpg",
+      img: `${base}teams/raygad-royals.jpg`,
       tag: "राजधानीचा रुबाब",
       border: "border-rose-400/40"
     },
     {
       name: "प्रतापगड फायटर्स",
       subtitle: "Pratapgad Fighters",
-      img: "/teams/pratapgad-fighters.jpg",
+      img: `${base}teams/pratapgad-fighters.jpg`,
       tag: "रणधुरंधर लढाऊ",
       border: "border-amber-500/40"
     }
@@ -140,13 +143,17 @@ export default function Home() {
                 <div className="absolute -inset-1.5 bg-linear-to-r from-orange-500 to-amber-500 rounded-3xl blur-md opacity-40 group-hover:opacity-60 transition duration-300"></div>
                 <div className="relative bg-slate-900 rounded-3xl overflow-hidden border-2 border-orange-300 shadow-2xl">
                   <img 
-                    src="/jagewala-baba.jpg" 
-                    alt="श्री जागेवाला बाबा" 
-                    className="w-full h-80 sm:h-96 object-cover object-center transform transition duration-500 group-hover:scale-105"
-                    onError={(e) => {
-                      e.target.src = "https://images.unsplash.com/photo-1544717305-2782549b5136?w=600";
-                    }}
-                  />
+                  src={`${base}jagewala-baba.jpg`} 
+                  alt="श्री जागेवाला बाबा" 
+                  className="w-full h-80 sm:h-96 object-cover object-center transform transition duration-500 group-hover:scale-105"
+                  onError={(e) => {
+                    // jar jpg sapadli nahi tar png try karel
+                    if (!e.target.dataset.triedPng) {
+                      e.target.dataset.triedPng = "true";
+                      e.target.src = `${base}jagewala-baba.png`;
+                    }
+                  }}
+                />
                   <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4 text-center">
                     <span className="text-amber-300 font-black text-base sm:text-lg tracking-wide drop-shadow-md">
                       श्री जागेवाला बाबा
