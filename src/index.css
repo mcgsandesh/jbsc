@@ -1,0 +1,9 @@
+/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+
+body {
+  font-family: 'Plus Jakarta Sans', 'Noto Sans Devanagari', sans-serif;
+}
