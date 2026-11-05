@@ -11,6 +11,7 @@ import Dashboard from "./modules/admin/Dashboard";
 import Events from "./modules/admin/Events";
 import Users from "./modules/admin/Users";
 import ManageRegistrations from "./modules/admin/ManageRegistrations"; // <-- हे इंपोर्ट करा
+import FinanceModule from "./modules/admin/FinanceModule";
 
 export default function App() {
   return (
@@ -33,6 +34,7 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="events" element={<Events />} />
           <Route path="registrations" element={<ManageRegistrations />} /> {/* <-- नवीन ॲडमिन रूट */}
+          <Route path="finance" element={<FinanceModule />} />
           <Route path="users" element={<Users />} />
         </Route>
       </Routes>

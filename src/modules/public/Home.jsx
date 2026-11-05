@@ -1,5 +1,5 @@
 // src/modules/public/Home.jsx
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
   Trophy, 
@@ -9,19 +9,72 @@ import {
   ArrowRight, 
   CheckCircle2,
   Users,
-  Swords
+  QrCode,
+  CreditCard,
+  Copy,
+  ExternalLink,
+  X
 } from "lucide-react";
+import { getAllEvents } from "../../services/eventService";
+import { showSuccess } from "../../utils/alert";
 
 export default function Home() {
-  // षट् क्रिकेट-सङ्घाः
-
   const base = import.meta.env.BASE_URL;
+
+  const [liveEvent, setLiveEvent] = useState(null);
+  const [isUpiModalOpen, setIsUpiModalOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchLiveEvent = async () => {
+      try {
+        const events = await getAllEvents();
+        if (events && events.length > 0) {
+          // Firestore nusar isActive: true aslela event ghyava
+          const active = events.find(e => e.isActive === true) || events[0];
+          setLiveEvent(active);
+        }
+      } catch (err) {
+        console.error("Live event load error:", err);
+      }
+    };
+    fetchLiveEvent();
+  }, []);
+
+  // Firestore exact path: upiSettings.upiId aani upiSettings.payeeName
+  const upiId = 
+    liveEvent?.upiSettings?.upiId || 
+    liveEvent?.upiId || 
+    "";
+
+  const payeeName = 
+    liveEvent?.upiSettings?.payeeName || 
+    liveEvent?.upiPayeeName || 
+    liveEvent?.title || 
+    "JBSC Events";
+
+  const amount = Number(liveEvent?.baseAmount) || 200;
+
+  // Realtime UPI Link
+  const upiDeepLink = upiId 
+    ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent((liveEvent?.title || "Event") + " Fee")}`
+    : "";
+
+  // Dynamic Realtime QR Code
+  const qrCodeUrl = upiDeepLink
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data=${encodeURIComponent(upiDeepLink)}`
+    : "";
+
+  const copyUpiId = () => {
+    if (!upiId) return;
+    navigator.clipboard.writeText(upiId);
+    showSuccess("कॉपी झाले!", "UPI ID क्लिपबोर्डवर कॉपी झाला आहे.");
+  };
 
   const cricketTeams = [
     {
       name: "लोहगड लायन्स",
       subtitle: "Lohagad Lions",
-      img: `${base}teams/lohagad-lions.jpg`, // jar file capital asel tar exact naav taka, e.g. Lohagad-Lions.jpg
+      img: `${base}teams/lohagad-lions.jpg`,
       tag: "शौर्य आणि ताकद",
       border: "border-amber-400/40"
     },
@@ -62,7 +115,6 @@ export default function Home() {
     }
   ];
 
-  // वार्षिकोत्सवाः
   const otherEvents = [
     {
       id: "shivjayanti",
@@ -84,26 +136,25 @@ export default function Home() {
     },
     {
       id: "dipostav",
-      title: "दीपोत्सव २०२६",
+      title: liveEvent?.title || "दीपोत्सव २०२६",
       tagline: "एकत्रित प्रकाश, एकत्रित आनंद",
       desc: "हजारो दिव्यांची रोषणाई, विविध स्पर्धा, महिलांसाठी विशेष खेळ व स्नेहभोजन सोहळा.",
-      badge: "नोंदणी सुरू आहे",
+      badge: liveEvent?.isActive !== false ? "नोंदणी सुरू आहे" : "नोंदणी बंद",
       icon: HeartHandshake,
       badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse",
       featured: true,
-      actionLink: "/register"
+      actionLink: liveEvent?.slug ? `/${liveEvent.slug}` : "/register"
     }
   ];
 
   return (
     <div className="w-full font-sans pb-16 selection:bg-orange-500 selection:text-white">
       
-      {/* १. मुख्यभागः (HERO SECTION: जागेवाला बाबा दर्शनम्) */}
-      <section className="relative overflow-hidden pt-6 pb-14 sm:pt-10 sm:pb-20 bg-linear-to-b from-orange-50/70 via-white to-slate-50 border-b border-slate-200">
+      {/* 1. Hero Section */}
+      <section className="relative overflow-hidden pt-6 pb-12 sm:pt-10 sm:pb-16 bg-gradient-to-b from-orange-50/70 via-white to-slate-50 border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex flex-col lg:flex-row items-center justify-between gap-8 sm:gap-12">
             
-            {/* वामभागः */}
             <div className="text-center lg:text-left flex-1">
               <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-orange-100/70 border border-orange-200 text-orange-800 text-xs sm:text-sm font-black mb-4">
                 <span>🚩</span>
@@ -121,13 +172,14 @@ export default function Home() {
 
               <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-3">
                 <Link
-                  to="/register"
+                  to={liveEvent?.slug ? `/${liveEvent.slug}` : "/register"}
                   className="px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-orange-600/30 transition transform active:scale-95 flex items-center gap-2"
                 >
-                  <span>दीपोत्सव २०२६ सहभाग नोंदवा</span>
+                  <span>{liveEvent?.title || "दीपोत्सव २०२६"} सहभाग नोंदवा</span>
                   <ArrowRight className="w-4 h-4" />
                 </Link>
                 
+                {/* Navbar pramane direct /public-list pathva jyane list 100% load hote */}
                 <Link
                   to="/public-list"
                   className="px-5 py-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs sm:text-sm shadow-xs transition"
@@ -137,24 +189,22 @@ export default function Home() {
               </div>
             </div>
 
-            {/* दक्षिणभागः (श्री जागेवाला बाबा चित्रम्) */}
             <div className="w-full max-w-xs sm:max-w-sm shrink-0">
               <div className="relative group">
-                <div className="absolute -inset-1.5 bg-linear-to-r from-orange-500 to-amber-500 rounded-3xl blur-md opacity-40 group-hover:opacity-60 transition duration-300"></div>
+                <div className="absolute -inset-1.5 bg-gradient-to-r from-orange-500 to-amber-500 rounded-3xl blur-md opacity-40 group-hover:opacity-60 transition duration-300"></div>
                 <div className="relative bg-slate-900 rounded-3xl overflow-hidden border-2 border-orange-300 shadow-2xl">
                   <img 
-                  src={`${base}jagewala-baba.jpg`} 
-                  alt="श्री जागेवाला बाबा" 
-                  className="w-full h-80 sm:h-96 object-cover object-center transform transition duration-500 group-hover:scale-105"
-                  onError={(e) => {
-                    // jar jpg sapadli nahi tar png try karel
-                    if (!e.target.dataset.triedPng) {
-                      e.target.dataset.triedPng = "true";
-                      e.target.src = `${base}jagewala-baba.png`;
-                    }
-                  }}
-                />
-                  <div className="absolute inset-0 bg-linear-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4 text-center">
+                    src={`${base}jagewala-baba.jpg`} 
+                    alt="श्री जागेवाला बाबा" 
+                    className="w-full h-80 sm:h-96 object-cover object-center transform transition duration-500 group-hover:scale-105"
+                    onError={(e) => {
+                      if (!e.target.dataset.triedPng) {
+                        e.target.dataset.triedPng = "true";
+                        e.target.src = `${base}jagewala-baba.png`;
+                      }
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-4 text-center">
                     <span className="text-amber-300 font-black text-base sm:text-lg tracking-wide drop-shadow-md">
                       श्री जागेवाला बाबा
                     </span>
@@ -170,8 +220,40 @@ export default function Home() {
         </div>
       </section>
 
-      {/* २. आमचा संकल्प (यथापूर्वम् संरक्षितः खण्डः) */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
+      {/* 2. Quick UPI Payment Widget (Live Card) */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
+        <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 text-white p-4 sm:p-5 rounded-3xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-orange-400/40">
+          <div className="flex items-center gap-3.5 text-center sm:text-left">
+            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/20">
+              <QrCode className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full">
+                  थेट फी भरा
+                </span>
+                <span className="text-sm sm:text-base font-black">
+                  {liveEvent?.title || "दीपोत्सव २०२६"}
+                </span>
+              </div>
+              <p className="text-xs text-orange-100 font-medium mt-0.5">
+                फॉर्म भरला आहे पण फी बाकी राहिली असल्यास थेट UPI किंवा QR कोडने भरा.
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setIsUpiModalOpen(true)}
+            className="w-full sm:w-auto px-5 py-2.5 bg-white text-orange-600 hover:bg-orange-50 font-black text-xs sm:text-sm rounded-xl shadow-md transition transform active:scale-95 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+          >
+            <CreditCard className="w-4 h-4" />
+            <span>QR कोड व UPI पेमेंट</span>
+          </button>
+        </div>
+      </section>
+
+      {/* 3. Sankalp Section */}
+      <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-6">
         <div className="bg-slate-900 text-white rounded-3xl p-6 sm:p-10 shadow-xl relative overflow-hidden">
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
             <div className="max-w-xl text-center md:text-left">
@@ -202,7 +284,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ३. प्रमुखोत्सवाः तथा च क्रिकेट-पत्रके सङ्घानां समावेशः */}
+      {/* 4. Events & Cricket Leagues */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-4 space-y-6">
         <div className="text-center mb-6">
           <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -213,7 +295,6 @@ export default function Home() {
           </p>
         </div>
 
-        {/* अत्र क्रिकेट-पत्रके (Cricket Card) एव षट्-सङ्घाः प्रदर्शिताः */}
         <div className="bg-white rounded-3xl p-5 sm:p-8 border border-orange-200/90 shadow-md">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-6">
             <div>
@@ -230,7 +311,6 @@ export default function Home() {
             </div>
           </div>
 
-          {/* ६ सङ्घानां चक्रव्यूहः (६ संघांचे ग्रिड) */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
             {cricketTeams.map((team, idx) => (
               <div 
@@ -266,7 +346,6 @@ export default function Home() {
           </div>
         </div>
 
-        {/* अवशिष्टाः ३ उत्सवाः (इतर तीन इव्हेंट्स) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {otherEvents.map((ev) => {
             const Icon = ev.icon;
@@ -307,7 +386,7 @@ export default function Home() {
                       नोंदणी चालू आहे
                     </span>
                     <Link
-                      to="/register"
+                      to={ev.actionLink}
                       className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
                     >
                       आता नोंदणी करा
@@ -320,7 +399,87 @@ export default function Home() {
         </div>
       </section>
 
-      {/* ४. पादलेखः (FOOTER CREDITS) */}
+      {/* 5. UPI Modal (Realtime Live QR Code) */}
+      {isUpiModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
+            
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  फी भरा (UPI Payment)
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  {liveEvent?.title || "दीपोत्सव २०२६"}
+                </p>
+              </div>
+              <button 
+                onClick={() => setIsUpiModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-2.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                कोणत्याही UPI ॲपने स्कॅन करा
+              </span>
+
+              {/* Realtime QR Code */}
+              {qrCodeUrl ? (
+                <img 
+                  src={qrCodeUrl} 
+                  alt="UPI QR Code" 
+                  className="w-48 h-48 mx-auto object-contain rounded-2xl border border-slate-200 bg-white p-2 shadow-xs"
+                />
+              ) : (
+                <div className="w-48 h-48 mx-auto bg-white rounded-2xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-3 text-center">
+                  <QrCode className="w-10 h-10 text-slate-400 mb-1" />
+                  <span className="text-[11px] font-bold text-slate-600">QR Code तयार होत आहे...</span>
+                </div>
+              )}
+
+              <div className="text-2xl font-black text-slate-900">
+                ₹{amount}
+              </div>
+
+              {/* Firestore data: upiSettings.upiId */}
+              {upiId && (
+                <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
+                  <span className="font-mono text-slate-700 font-bold truncate">
+                    {upiId}
+                  </span>
+                  <button
+                    onClick={copyUpiId}
+                    className="p-1 text-slate-400 hover:text-orange-600 transition cursor-pointer"
+                    title="UPI ID कॉपी करा"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {upiDeepLink && (
+              <a
+                href={upiDeepLink}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-xs transition active:scale-95"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>GPay / PhonePe / Paytm ने भरा</span>
+              </a>
+            )}
+
+            <p className="text-[10px] text-center text-slate-400 font-medium leading-relaxed">
+              पेमेंट झाल्यावर स्क्रीनशॉट जतन करा किंवा कमिटी सदस्यांना दाखवा.
+            </p>
+
+          </div>
+        </div>
+      )}
+
+      {/* 6. Footer */}
       <footer className="mt-12 text-center text-slate-400 text-xs border-t border-slate-200 pt-6">
         <p className="font-bold text-slate-600">
           © १९९६ जागेवाला बाबा स्पोर्ट्स क्लब (JBSC) • सर्व हक्क राखीव.

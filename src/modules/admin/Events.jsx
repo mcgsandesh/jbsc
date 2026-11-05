@@ -1,6 +1,5 @@
 // src/modules/admin/Events.jsx
 import React, { useState, useEffect } from "react";
-// src/modules/admin/Events.jsx chya var:
 import { 
   Plus, 
   Trash2, 
@@ -16,20 +15,21 @@ import {
   QrCode,
   MessageSquareShare,
   Link as LinkIcon,
-  Copy
+  Calendar,
+  Clock
 } from "lucide-react";
 import { getAllEvents, saveEventSchema } from "../../services/eventService";
 import { showSuccess, showError } from "../../utils/alert";
 
 export default function Events() {
-  const [lang, setLang] = useState("mr"); // 'mr' = Marathi, 'en' = English
+  const [lang, setLang] = useState("mr");
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [isEditing, setIsEditing] = useState(false);
 
-  const [slug, setSlug] = useState(""); // Custom URL Slug (e.g. dipotsav-26)
+  const [slug, setSlug] = useState("");
 
-  // इव्हेंट मूलभूत माहिती
+  // Event basic info
   const [eventId, setEventId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -38,28 +38,32 @@ export default function Events() {
   const [baseAmount, setBaseAmount] = useState(0);
   const [isActive, setIsActive] = useState(true);
 
-  // UPI पेमेंट सेटिंग्स
+  // Navin: Event Date & Time States
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [eventTime, setEventTime] = useState("");
+
+  // UPI Payment settings
   const [upiId, setUpiId] = useState("");
   const [payeeName, setPayeeName] = useState("");
 
-  // व्हॉट्सॲप मेसेज टेम्पलेट
+  // WhatsApp Message Template
   const [whatsappTemplate, setWhatsappTemplate] = useState("");
 
-  // डायनॅमिक फॉर्म फील्ड्स
+  // Dynamic Form Fields
   const [fields, setFields] = useState([]);
 
-  // नवीन फील्डसाठी तात्पुरती स्टेट
+  // Navin field states
   const [newFieldLabel, setNewFieldLabel] = useState("");
   const [newFieldType, setNewFieldType] = useState("text");
   const [newFieldRequired, setNewFieldRequired] = useState(true);
   const [newFieldOptions, setNewFieldOptions] = useState("");
   const [newFieldValidation, setNewFieldValidation] = useState("none");
 
-  // डिक्शनरी (मराठी व इंग्रजी)
   const t = {
     mr: {
       pageTitle: "डायनॅमिक इव्हेंट व फॉर्म बिल्डर",
-      pageSub: "Google Forms प्रमाणे फील्ड्स, UPI पेमेंट आणि WhatsApp टेम्पलेट सेट करा",
+      pageSub: "Google Forms प्रमाणे फील्ड्स, तारीख, UPI पेमेंट आणि WhatsApp टेम्पलेट सेट करा",
       newEventBtn: "नवीन इव्हेंट फॉर्म बनवा",
       noEvents: "कोणताही इव्हेंट सापडला नाही. नवीन इव्हेंट तयार करा.",
       loading: "इव्हेंट्स लोड होत आहेत...",
@@ -69,13 +73,13 @@ export default function Events() {
       fee: "नोंदणी फी",
       fieldsCount: "फॉर्म फील्ड्स",
       editForm: "फॉर्म एडिट करा",
-      sec1: "१. इव्हेंटची मूलभूत माहिती व बॅनर",
+      sec1: "१. इव्हेंटची मूलभूत माहिती, तारीख व बॅनर",
       eventTitle: "इव्हेंटचे नाव (Title)",
       eventTitlePh: "उदा. जेबीएससी दीपोत्सव २०२६ किंवा बॉक्स क्रिकेट चषक २०२६",
       regFee: "नोंदणी फी (₹)",
       bannerPh: "https://example.com/poster.jpg (बॅनर इमेज लिंक)",
       descLabel: "इव्हेंटचे नियम व माहिती (Description)",
-      descPh: "इव्हेंटचे नियम, वेळ, पत्ता आणि महत्त्वाची माहिती येथे लिहा...",
+      descPh: "इव्हेंटचे नियम, पत्ता आणि महत्त्वाची माहिती येथे लिहा...",
       activeToggle: "हा फॉर्म लोकांच्या नोंदणीसाठी सुरू (Active) ठेवा",
       
       secUpi: "२. UPI पेमेंट तपशील (ऑनलाइन देणगी / फी)",
@@ -113,7 +117,7 @@ export default function Events() {
     },
     en: {
       pageTitle: "Dynamic Event & Form Builder",
-      pageSub: "Configure Google Forms-style fields, UPI payments, and WhatsApp templates",
+      pageSub: "Configure Google Forms-style fields, dates, UPI payments, and WhatsApp templates",
       newEventBtn: "Create New Event Form",
       noEvents: "No events found. Please create a new event.",
       loading: "Loading events...",
@@ -123,13 +127,13 @@ export default function Events() {
       fee: "Registration Fee",
       fieldsCount: "Form Fields",
       editForm: "Edit Form",
-      sec1: "1. Event Basic Info & Banner",
+      sec1: "1. Event Basic Info, Dates & Banner",
       eventTitle: "Event Title",
       eventTitlePh: "e.g. JBSC Dipotsav 2026 or Box Cricket Cup 2026",
       regFee: "Registration Fee (₹)",
       bannerPh: "https://example.com/poster.jpg (Banner Image URL)",
       descLabel: "Event Rules & Description",
-      descPh: "Enter event rules, timing, venue, and important guidelines...",
+      descPh: "Enter event rules, venue, and important guidelines...",
       activeToggle: "Keep form Active for public registrations",
 
       secUpi: "2. UPI Payment Settings",
@@ -192,17 +196,20 @@ export default function Events() {
     setYear(2026);
     setBaseAmount(0);
     setIsActive(true);
+    setStartDate("");
+    setEndDate("");
+    setEventTime("संध्या. ६:०० वा.");
+    setSlug("");
     setUpiId("");
     setPayeeName("Jagewala Baba Sports Club");
     setWhatsappTemplate(
       "सस्नेह जय महाराष्ट्र {name}जी! 🚩\n\nJBSC आयोजित {event} मध्ये आपली नोंदणी यशस्वीरीत्या प्राप्त झाली आहे.\nनोंदणी फी: ₹{amount}\nपेमेंट स्थिती: {status}\n\nकाही अडचण असल्यास कमिटीशी संपर्क साधावा. धन्यवाद!"
     );
     
-    // डीफॉल्ट मूलभूत फील्ड्स
     setFields([
       { id: "fullName", label: "पूर्ण नाव (Full Name)", type: "text", required: true, validation: "textOnly" },
       { id: "mobile", label: "व्हॉट्सॲप नंबर (WhatsApp No)", type: "tel", required: true, validation: "mobile10" },
-      { id: "address", label: "पत्ता / रूम क्र. (Address)", type: "text", required: false, validation: "none" },
+      { id: "food", label: "जेवण पर्याय (Food)", type: "radio", required: true, options: ["Veg", "Non-Veg"], validation: "none" },
     ]);
     setIsEditing(true);
   };
@@ -252,18 +259,24 @@ export default function Events() {
     }
 
     const finalSlug = slug.trim() 
-        ? slug.trim().toLowerCase().replace(/[^a-zA-Z0-9-]/g, "")
-        : `event-${Date.now().toString().slice(-4)}`;
+      ? slug.trim().toLowerCase().replace(/[^a-zA-Z0-9-]/g, "")
+      : `event-${Date.now().toString().slice(-4)}`;
 
     try {
       const payload = {
         title: title.trim(),
-        slug: finalSlug, // <-- Ha navin slug
+        slug: finalSlug,
         description: description.trim(),
         bannerUrl: bannerUrl.trim(),
         year: Number(year),
         baseAmount: Number(baseAmount),
         isActive: Boolean(isActive),
+        
+        // Navin: Tarikh aani vel payload
+        startDate: startDate.trim(),
+        endDate: endDate.trim(),
+        eventTime: eventTime.trim(),
+
         upiSettings: {
           upiId: upiId.trim(),
           payeeName: payeeName.trim(),
@@ -273,7 +286,7 @@ export default function Events() {
       };
 
       await saveEventSchema(eventId, payload);
-      showSuccess(lang === "mr" ? "यशस्वी!" : "Success!", lang === "mr" ? "इव्हेंट, UPI व WhatsApp टेम्पलेट जतन झाले." : "Event saved successfully.");
+      showSuccess(lang === "mr" ? "यशस्वी!" : "Success!", lang === "mr" ? "इव्हेंट तपशील, तारीख व फॉर्म जतन झाले." : "Event saved successfully.");
       setIsEditing(false);
       fetchEventsList();
     } catch (err) {
@@ -285,12 +298,19 @@ export default function Events() {
   const handleEditExisting = (item) => {
     setEventId(item.id);
     setTitle(item.title || "");
+    setSlug(item.slug || "");
     setDescription(item.description || "");
     setBannerUrl(item.bannerUrl || "");
     setYear(item.year || 2026);
     setBaseAmount(item.baseAmount || 0);
     setIsActive(item.isActive !== undefined ? item.isActive : true);
-    setUpiId(item.upiSettings?.upiId || "");
+    
+    // Existing Date & Time load karne
+    setStartDate(item.startDate || item.date || "");
+    setEndDate(item.endDate || "");
+    setEventTime(item.eventTime || item.time || "");
+
+    setUpiId(item.upiSettings?.upiId || item.upiId || "");
     setPayeeName(item.upiSettings?.payeeName || "Jagewala Baba Sports Club");
     setWhatsappTemplate(item.whatsappTemplate || "");
     setFields(item.fields || []);
@@ -300,7 +320,7 @@ export default function Events() {
   return (
     <div className="w-full space-y-6 font-sans">
       
-      {/* Top Header Banner with Language Switcher */}
+      {/* Top Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="p-2.5 rounded-xl bg-orange-50 text-orange-600 border border-orange-100">
@@ -370,13 +390,26 @@ export default function Events() {
                   </div>
 
                   <h3 className="font-black text-lg text-slate-900">{item.title}</h3>
+                  
+                  {/* Tarikh Display */}
+                  {(item.startDate || item.date) && (
+                    <div className="flex items-center gap-1.5 text-xs text-orange-700 font-bold mt-1.5">
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>
+                        {item.startDate || item.date}
+                        {item.endDate ? ` ते ${item.endDate}` : ""}
+                        {item.eventTime ? ` (${item.eventTime})` : ""}
+                      </span>
+                    </div>
+                  )}
+
                   {item.description && (
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{item.description}</p>
+                    <p className="text-xs text-slate-500 mt-2 line-clamp-2">{item.description}</p>
                   )}
 
                   <div className="text-xs text-slate-500 mt-3 pt-3 border-t border-slate-100 space-y-1">
                     <div>{t.fee}: <strong className="text-slate-800">₹{item.baseAmount || 0}</strong></div>
-                    <div>UPI ID: <strong className="text-slate-800">{item.upiSettings?.upiId || "सेट नाही"}</strong></div>
+                    <div>UPI ID: <strong className="text-slate-800">{item.upiSettings?.upiId || item.upiId || "सेट नाही"}</strong></div>
                     <div>{t.fieldsCount}: <strong className="text-slate-800">{item.fields?.length || 0}</strong></div>
                   </div>
                 </div>
@@ -399,15 +432,13 @@ export default function Events() {
       {isEditing && (
         <div className="space-y-6">
           
-          {/* Section 1: Basic Info & Banner */}
+          {/* Section 1: Basic Info, Date/Time & Banner */}
           <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
             <h3 className="font-bold text-base text-slate-900 flex items-center gap-2">
               <Settings2 className="w-5 h-5 text-orange-600" />
               {t.sec1}
             </h3>
 
-            
-            
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="sm:col-span-2">
                 <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -435,6 +466,61 @@ export default function Events() {
               </div>
             </div>
 
+            {/* Navin: Date and Time Row */}
+            <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-200 space-y-3">
+              <label className="block text-xs font-black text-amber-950 flex items-center gap-1.5">
+                <Calendar className="w-4 h-4 text-amber-600" />
+                इव्हेंट तारीख व वेळ (Event Schedule)
+              </label>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {/* Start Date */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    सुरू होण्याची तारीख (Start Date) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="उदा. २५ नोव्हेंबर २०२६"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white font-medium focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                {/* End Date (Optional for range) */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    शेवटची तारीख (Range असल्यास ऐच्छिक)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="उदा. २७ नोव्हेंबर २०२६"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white font-medium focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+
+                {/* Event Time */}
+                <div>
+                  <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                    वेळ (Event Time)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="उदा. संध्याकाळी ६:०० वाजता"
+                    value={eventTime}
+                    onChange={(e) => setEventTime(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs bg-white font-medium focus:outline-none focus:border-orange-500"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] text-amber-800 font-medium">
+                * सिंगल डे इव्हेंट असेल तर फक्त Start Date भरा. २-३ दिवसांचा उत्सव असेल तर Start आणि End Date दोन्ही भरा.
+              </p>
+            </div>
+
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1 flex items-center gap-1.5">
                 <ImageIcon className="w-3.5 h-3.5 text-orange-600" /> बॅनर इमेज (Poster URL)
@@ -449,27 +535,24 @@ export default function Events() {
             </div>
 
             {/* Custom URL Slug Box */}
-                <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-200">
-                <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
-                    <LinkIcon className="w-3.5 h-3.5 text-orange-600" />
-                    Swatantra Nondani Link (Custom URL Slug)
-                </label>
-                <div className="flex items-center gap-2">
-                    <span className="text-xs font-mono text-slate-500 bg-white px-3 py-2.5 rounded-xl border border-slate-200">
-                    {window.location.origin}/#/
-                    </span>
-                    <input
-                    type="text"
-                    placeholder="dipotsav-26 kiva cricket-26"
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-zA-Z0-9-]/g, ""))}
-                    className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white font-mono font-bold text-orange-600 focus:outline-none focus:border-orange-500"
-                    />
-                </div>
-                <p className="text-[11px] text-slate-500 mt-1">
-                    * Hi link tumhi WhatsApp var share karu shakta (Uda. #/dipotsav-26).
-                </p>
-                </div>
+            <div className="p-4 rounded-2xl bg-orange-50/60 border border-orange-200">
+              <label className="block text-xs font-bold text-slate-800 mb-1 flex items-center gap-1.5">
+                <LinkIcon className="w-3.5 h-3.5 text-orange-600" />
+                स्वतंत्र नोंदणी लिंक (Custom URL Slug)
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono text-slate-500 bg-white px-3 py-2.5 rounded-xl border border-slate-200">
+                  {window.location.origin}/#/
+                </span>
+                <input
+                  type="text"
+                  placeholder="dipotsav-26 kiva cricket-26"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-zA-Z0-9-]/g, ""))}
+                  className="flex-1 px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm bg-white font-mono font-bold text-orange-600 focus:outline-none focus:border-orange-500"
+                />
+              </div>
+            </div>
 
             <div>
               <label className="block text-xs font-bold text-slate-700 mb-1">
@@ -534,9 +617,6 @@ export default function Events() {
                 />
               </div>
             </div>
-            <p className="text-[11px] text-slate-400">
-              * येथे भरलेल्या UPI आयडीनुसार पब्लिक फॉर्मवर "Pay with UPI" लिंक आणि QR कोड आपोआप तयार होईल.
-            </p>
           </div>
 
           {/* Section 3: WhatsApp Template */}
@@ -557,9 +637,6 @@ export default function Events() {
                 onChange={(e) => setWhatsappTemplate(e.target.value)}
                 className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:outline-none focus:border-green-500 font-sans"
               />
-              <p className="text-[11px] text-slate-500 mt-1.5 font-medium">
-                {t.waHint}
-              </p>
             </div>
           </div>
 
@@ -587,15 +664,15 @@ export default function Events() {
                           {f.type}
                         </span>
                         {f.required ? (
-                          <span className="text-rose-500 font-semibold">• {t.required}</span>
+                          <span className="text-rose-500 font-semibold">{t.required}</span>
                         ) : (
-                          <span className="text-slate-400">• {t.optional}</span>
+                          <span className="text-slate-400">{t.optional}</span>
                         )}
                         {f.validation && f.validation !== "none" && (
-                          <span className="text-blue-600 font-semibold">• {t.rule}: {f.validation}</span>
+                          <span className="text-blue-600 font-semibold">{t.rule}: {f.validation}</span>
                         )}
                         {f.options?.length > 0 && (
-                          <span className="text-slate-600">• {t.options}: {f.options.join(", ")}</span>
+                          <span className="text-slate-600">{t.options}: {f.options.join(", ")}</span>
                         )}
                       </div>
                     </div>
@@ -655,7 +732,6 @@ export default function Events() {
                 </select>
               </div>
 
-              {/* Validation Dropdown */}
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   {t.validationRule}
@@ -673,7 +749,6 @@ export default function Events() {
               </div>
             </div>
 
-            {/* Options Input for Select / Radio / Checkbox */}
             {["select", "radio", "checkbox"].includes(newFieldType) && (
               <div>
                 <label className="block text-xs font-bold text-slate-700 mb-1">

@@ -14,7 +14,6 @@ import {
 } from "lucide-react";
 import { logoutUser } from "../services/authService";
 import { APP_CONFIG } from "../config/constants";
-import { getPermissions } from "../utils/permissions";
 import { useAuth } from "../context/AuthContext";
 
 export default function AdminLayout() {
@@ -23,7 +22,7 @@ export default function AdminLayout() {
   const location = useLocation();
 
   // 1. Firebase Auth State
-  const { currentUser, loading } = useAuth();
+  const { currentUser, loading, isSuperAdmin } = useAuth();
 
   // 2. Loading State
   if (loading) {
@@ -42,11 +41,27 @@ export default function AdminLayout() {
     return <Navigate to="/admin/login" state={{ from: location }} replace />;
   }
 
-  const userRole = (currentUser?.role || "volunteer").toLowerCase();
-  const perms = getPermissions(currentUser);
+  // Role Normalization (volunteer, desk_admin, finance_admin, superadmin)
+  const rawRole = (currentUser?.role || "volunteer").toLowerCase().trim();
+  const userRole = rawRole.replace(/\s+/g, "_");
 
-  // 4. Central Route Protection (URL Direct Hack Prevention)
-  // Pratyek path saathi permission map
+  const isFinance = userRole === "finance_admin" || userRole === "finance";
+  const isDesk = userRole === "desk_admin" || userRole === "desk";
+
+  // 4. Tested Role Permissions
+  // - Volunteer: Fakt Registrations
+  // - Desk Admin: Dashboard + Registrations (Paid/Unpaid check)
+  // - Finance Admin: Dashboard + Registrations + Finance (Jama-Kharch)
+  // - Superadmin: All 5 options
+  const perms = {
+    canViewDashboard: isSuperAdmin || isFinance || isDesk,
+    canManageEvents: isSuperAdmin,
+    canViewRegistrations: true, // Sagle 4 roles nondani pahil/hajeri lavtil
+    canManageFinance: isSuperAdmin || isFinance, // Fakt Superadmin aani Finance Admin
+    canManageUsers: isSuperAdmin, // Fakt Superadmin
+  };
+
+  // 5. Central Route Protection (Direct URL type kelyas adavne)
   const routePermissions = {
     "/admin/dashboard": perms.canViewDashboard,
     "/admin/events": perms.canManageEvents,
@@ -57,9 +72,8 @@ export default function AdminLayout() {
 
   const currentPath = location.pathname;
 
-  // Jar user kade current URL chi permission nasel (uda: Volunteer ne /admin/dashboard kinva /admin/events ughadle)
+  // Jar parwangi naslelya URL var gela tar direct registrations var pathva
   if (routePermissions[currentPath] === false) {
-    // Tyala thet tyachya allowed page kade (Registrations) pathva
     return <Navigate to="/admin/registrations" replace />;
   }
 
@@ -69,7 +83,7 @@ export default function AdminLayout() {
     navigate("/admin/login");
   };
 
-  // 5. Perms nusar Navigation Menu Items
+  // 6. Navigation Menu Items
   const navItems = [
     ...(perms.canViewDashboard ? [{ label: "डॅशबोर्ड", path: "/admin/dashboard", icon: LayoutDashboard }] : []),
     ...(perms.canManageEvents ? [{ label: "इव्हेंट्स", path: "/admin/events", icon: CalendarDays }] : []),
@@ -90,7 +104,7 @@ export default function AdminLayout() {
             {APP_CONFIG.APP_NAME}
           </span>
           <span className="text-[10px] bg-slate-100 text-slate-600 px-1.5 py-0.5 rounded font-bold uppercase">
-            {userRole}
+            {rawRole}
           </span>
         </div>
         <button
@@ -108,7 +122,7 @@ export default function AdminLayout() {
         }`}
       >
         <div>
-          {/* Logo & Info */}
+          {/* Logo & User Info */}
           <div className="p-6 border-b border-slate-800">
             <h2 className="text-xl font-black text-orange-500 tracking-wide">
               {APP_CONFIG.APP_NAME}
@@ -118,7 +132,7 @@ export default function AdminLayout() {
             </p>
             <div className="mt-2.5 flex items-center gap-2">
               <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider bg-orange-500/20 text-orange-400 border border-orange-500/30">
-                {userRole}
+                {rawRole}
               </span>
               <span className="text-[11px] text-slate-400 truncate max-w-[120px]">
                 {currentUser?.email}
@@ -126,7 +140,7 @@ export default function AdminLayout() {
             </div>
           </div>
 
-          {/* Desktop Nav Items */}
+          {/* Nav Items */}
           <nav className="p-3 space-y-1.5">
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -152,13 +166,13 @@ export default function AdminLayout() {
         {/* Sidebar Footer */}
         <div className="p-4 border-t border-slate-800 space-y-2">
           <Link
-  to="/"
-  onClick={() => setSidebarOpen(false)}
-  className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
->
-  <ExternalLink className="w-3.5 h-3.5" />
-  मुख्य वेबसाईट पहा
-</Link>
+            to="/"
+            onClick={() => setSidebarOpen(false)}
+            className="w-full flex items-center justify-center gap-2 py-2 px-3 text-xs text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition"
+          >
+            <ExternalLink className="w-3.5 h-3.5" />
+            मुख्य वेबसाईट पहा
+          </Link>
           <button
             onClick={handleLogout}
             className="w-full flex items-center justify-center gap-2 py-2.5 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-xl text-xs font-semibold transition cursor-pointer"
@@ -177,12 +191,12 @@ export default function AdminLayout() {
         />
       )}
 
-      {/* Main View */}
+      {/* Main Content View */}
       <main className="flex-1 w-full min-w-0 p-4 sm:p-6 lg:p-8 pb-24 md:pb-8 overflow-y-auto">
         <Outlet />
       </main>
 
-      {/* Admin Mobile Bottom Navigation */}
+      {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-2px_10px_rgba(0,0,0,0.06)]">
         <div 
           className="grid h-16" 

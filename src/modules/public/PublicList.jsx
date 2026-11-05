@@ -7,16 +7,21 @@ import {
   ArrowLeft, 
   CheckCircle2, 
   Clock, 
-  RefreshCw,
-  AlertCircle,
-  UtensilsCrossed,
-  IndianRupee,
-  Salad,
-  Drumstick,
-  Lock
+  RefreshCw, 
+  AlertCircle, 
+  UtensilsCrossed, 
+  IndianRupee, 
+  Salad, 
+  Drumstick, 
+  Lock, 
+  CreditCard, 
+  QrCode, 
+  X, 
+  Copy, 
+  ExternalLink 
 } from "lucide-react";
 import { getAllEvents } from "../../services/eventService";
-import { showError } from "../../utils/alert";
+import { showError, showSuccess } from "../../utils/alert";
 
 export default function PublicList() {
   const { slug } = useParams();
@@ -27,6 +32,7 @@ export default function PublicList() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [activePayItem, setActivePayItem] = useState(null);
 
   const fetchListData = async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -38,18 +44,19 @@ export default function PublicList() {
 
       if (slug) {
         matchedEvent = allEvents.find(
-          (e) => (e.slug && e.slug.toLowerCase() === slug.toLowerCase()) || e.id === slug
+          (e) => 
+            (e.slug && String(e.slug).toLowerCase() === String(slug).toLowerCase()) || 
+            (e.id && String(e.id).toLowerCase() === String(slug).toLowerCase())
         );
       }
 
       if (!matchedEvent && allEvents.length > 0) {
-        matchedEvent = allEvents[0];
+        matchedEvent = allEvents.find(e => e.isActive === true) || allEvents[0];
       }
 
       setEventData(matchedEvent);
 
-      // जर फॉर्म बंद असेल (isRegistrationOpen === false) तर शीट डेटा लोड न करता थेट थांबा
-      if (matchedEvent && matchedEvent.isRegistrationOpen === false) {
+      if (matchedEvent && matchedEvent.isActive === false) {
         setList([]);
         return;
       }
@@ -69,7 +76,7 @@ export default function PublicList() {
       }
     } catch (err) {
       console.error(err);
-      showError("Error", "नोंदणी यादी लोड करता आली नाही.");
+      showError("त्रुटी", "नोंदणी यादी लोड करता आली नाही.");
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -80,7 +87,6 @@ export default function PublicList() {
     fetchListData(true);
   }, [slug]);
 
-  // Food type helper
   const getFoodType = (item) => {
     for (let key in item) {
       const lowerKey = key.toLowerCase();
@@ -99,7 +105,6 @@ export default function PublicList() {
     return null;
   };
 
-  // Summary Card Statistics
   const stats = useMemo(() => {
     let vegCount = 0;
     let nonVegCount = 0;
@@ -137,7 +142,6 @@ export default function PublicList() {
     };
   }, [list, eventData]);
 
-  // Search Filter
   const filteredList = list.filter((item) => {
     const q = searchQuery.toLowerCase().trim();
     if (!q) return true;
@@ -148,7 +152,18 @@ export default function PublicList() {
     return name.includes(q) || regId.includes(q);
   });
 
-  // १. लोडिंग अवस्था
+  const upiId = eventData?.upiSettings?.upiId || eventData?.upiId || "";
+  const payeeName = eventData?.upiSettings?.payeeName || eventData?.title || "JBSC Events";
+
+  const getUpiDeepLink = (amount, note) => {
+    return `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent(note)}`;
+  };
+
+  const copyUpiId = (id) => {
+    navigator.clipboard.writeText(id);
+    showSuccess("कॉपी झाले!", "UPI ID क्लिपबोर्डवर कॉपी झाला आहे.");
+  };
+
   if (loading) {
     return (
       <div className="max-w-3xl mx-auto my-12 px-4">
@@ -160,8 +175,7 @@ export default function PublicList() {
     );
   }
 
-  // २. जर फॉर्म बंद असेल तर संपूर्ण यादी ब्लॉक करा (सुरक्षित गार्ड)
-  if (eventData && eventData.isRegistrationOpen === false) {
+  if (eventData && eventData.isActive === false) {
     return (
       <div className="max-w-md mx-auto my-12 px-4">
         <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 text-center shadow-sm">
@@ -188,23 +202,23 @@ export default function PublicList() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto my-4 px-3 sm:px-4 space-y-4 font-sans">
+    <div className="max-w-3xl mx-auto my-4 px-3 sm:px-4 space-y-3.5 font-sans">
       
       {/* Top Header */}
-      <div className="flex items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
-        <div className="flex items-center gap-2.5">
+      <div className="flex items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             onClick={() => navigate(slug ? `/${slug}` : "/register")}
-            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer"
+            className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition cursor-pointer shrink-0"
             title="मागे जा"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
-          <div>
-            <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-tight">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-xl font-black text-slate-900 tracking-tight leading-tight truncate">
               {eventData?.title || "नोंदणी यादी"}
             </h1>
-            <p className="text-[11px] text-slate-500 font-medium">
+            <p className="text-[11px] text-slate-500 font-medium truncate">
               वर्ष {eventData?.year || 2026} • सहभागी सदस्यांची अधिकृत यादी
             </p>
           </div>
@@ -221,62 +235,57 @@ export default function PublicList() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 sm:gap-3">
-        
-        {/* Card 1: Total */}
+      <div className="grid grid-cols-3 gap-2 sm:gap-3">
         <div className="bg-white p-2.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-tight">एकूण</span>
             <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-orange-500" />
           </div>
           <div className="mt-1">
-            <div className="text-lg sm:text-2xl font-black text-slate-900 leading-none">
+            <div className="text-base sm:text-2xl font-black text-slate-900 leading-none">
               {stats.total}
             </div>
             <div className="text-[9px] sm:text-[11px] font-semibold text-slate-400 mt-0.5">नोंदणी</div>
           </div>
         </div>
 
-        {/* Card 2: Food */}
         <div className="bg-white p-2.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-tight">जेवण</span>
             <UtensilsCrossed className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
+          <div className="mt-1 flex items-baseline gap-1.5 sm:gap-2">
             <div>
               <span className="text-xs sm:text-base font-black text-emerald-600">{stats.vegCount}</span>
               <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold ml-0.5">व्हेज</span>
             </div>
-            <div className="border-l border-slate-200 pl-2">
+            <div className="border-l border-slate-200 pl-1.5 sm:pl-2">
               <span className="text-xs sm:text-base font-black text-rose-600">{stats.nonVegCount}</span>
-              <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold ml-0.5">नॉनव्हेज</span>
+              <span className="text-[9px] sm:text-[10px] text-slate-400 font-bold ml-0.5">नॉन</span>
             </div>
           </div>
         </div>
 
-        {/* Card 3: Payments */}
         <div className="bg-white p-2.5 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-tight">फी जमा / बाकी</span>
             <IndianRupee className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-500" />
           </div>
-          <div className="mt-1 flex items-baseline gap-2">
+          <div className="mt-1 flex items-baseline gap-1.5 sm:gap-2">
             <div>
               <span className="text-xs sm:text-base font-black text-emerald-700">₹{stats.paidAmount}</span>
               <span className="text-[9px] sm:text-[10px] text-emerald-600 font-bold block sm:inline sm:ml-0.5">({stats.paidCount})</span>
             </div>
-            <div className="border-l border-slate-200 pl-1.5 sm:pl-2">
+            <div className="border-l border-slate-200 pl-1 sm:pl-2">
               <span className="text-xs sm:text-base font-black text-amber-700">₹{stats.pendingAmount}</span>
               <span className="text-[9px] sm:text-[10px] text-amber-600 font-bold block sm:inline sm:ml-0.5">({stats.pendingCount})</span>
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Search Input */}
-      <div className="bg-white p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
+      <div className="bg-white p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-sm flex items-center gap-2">
         <Search className="w-4 h-4 text-slate-400 ml-1 shrink-0" />
         <input
           type="text"
@@ -295,10 +304,10 @@ export default function PublicList() {
         )}
       </div>
 
-      {/* Registration List */}
-      <div className="space-y-2.5">
+      {/* Registration List: 2-Row Optimized Compact Layout */}
+      <div className="space-y-2">
         {filteredList.length === 0 ? (
-          <div className="py-14 text-center text-slate-400 text-xs sm:text-sm px-4 bg-white rounded-2xl border border-slate-200">
+          <div className="py-12 text-center text-slate-400 text-xs sm:text-sm px-4 bg-white rounded-2xl border border-slate-200">
             <AlertCircle className="w-8 h-8 text-slate-300 mx-auto mb-2" />
             {searchQuery ? "या नावाने कोणतीही नोंदणी सापडली नाही." : "या इव्हेंटसाठी अजून कोणतीही नोंदणी झालेली नाही."}
           </div>
@@ -309,63 +318,161 @@ export default function PublicList() {
             const status = String(row["Payment_Status"] || row["paymentStatus"] || "").toLowerCase();
             const isPaid = status === "paid" || status === "यशस्वी" || status === "free";
             const foodType = getFoodType(row);
+            const amt = Number(row["Amount"]) || Number(eventData?.baseAmount) || 0;
 
             return (
               <div 
                 key={index}
-                className="bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-sm flex items-center justify-between gap-3 hover:border-orange-200 transition"
+                className="bg-white px-3 py-2.5 sm:px-4 sm:py-3 rounded-2xl border border-slate-200/90 shadow-xs hover:border-orange-200 transition space-y-2"
               >
-                <div className="flex items-start gap-3 min-w-0">
-                  <span className="w-6 h-6 rounded-lg bg-slate-100 text-slate-500 text-[11px] font-bold flex items-center justify-center shrink-0 mt-0.5">
-                    {index + 1}
-                  </span>
-                  
-                  <div className="min-w-0">
-                    <h3 className="text-sm font-black text-slate-900 truncate leading-tight">
+                {/* 1st Row: Sr No + Full Name (Left) & Reg ID (Right) */}
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
+                      {index + 1}
+                    </span>
+                    <h3 className="text-xs sm:text-sm font-black text-slate-900 leading-tight break-words">
                       {fullName}
                     </h3>
+                  </div>
 
-                    <div className="flex flex-wrap items-center gap-1.5 mt-1.5">
-                      <span className="font-mono text-[10px] sm:text-[11px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded border border-orange-100">
-                        {regId}
+                  <span className="font-mono text-[9px] sm:text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-md border border-orange-100 shrink-0">
+                    {regId}
+                  </span>
+                </div>
+
+                {/* 2nd Row: Meal Badge (Left) & Status / Pay Button (Right) */}
+                <div className="flex items-center justify-between gap-2 pt-0.5 border-t border-slate-50">
+                  {/* Left: Food Badge */}
+                  <div>
+                    {foodType ? (
+                      <span className={`inline-flex items-center gap-1 text-[9px] font-bold px-2 py-0.5 rounded-md border ${
+                        foodType === "Veg"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : "bg-rose-50 text-rose-700 border-rose-200"
+                      }`}>
+                        {foodType === "Veg" ? (
+                          <Salad className="w-2.5 h-2.5 text-emerald-600" />
+                        ) : (
+                          <Drumstick className="w-2.5 h-2.5 text-rose-600" />
+                        )}
+                        <span>{foodType}</span>
                       </span>
+                    ) : (
+                      <span className="text-[10px] text-slate-300 font-semibold">•</span>
+                    )}
+                  </div>
 
-                      {foodType && (
-                        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded border ${
-                          foodType === "Veg"
-                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                            : "bg-rose-50 text-rose-700 border-rose-200"
-                        }`}>
-                          {foodType === "Veg" ? (
-                            <Salad className="w-3 h-3 text-emerald-600" />
-                          ) : (
-                            <Drumstick className="w-3 h-3 text-rose-600" />
-                          )}
-                          {foodType}
+                  {/* Right: Payment Status / Pay Button */}
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {isPaid ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                        <span>{status === "free" ? "Free" : "Paid"}</span>
+                      </span>
+                    ) : (
+                      <>
+                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                          <Clock className="w-2.5 h-2.5 text-amber-600" />
+                          <span>Pending</span>
                         </span>
-                      )}
-                    </div>
+
+                        <button
+                          onClick={() => setActivePayItem({ regId, fullName, amount: amt })}
+                          className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-[10px] font-black bg-orange-600 hover:bg-orange-700 text-white shadow-xs transition active:scale-95 cursor-pointer"
+                          title="UPI ने फी भरा"
+                        >
+                          <CreditCard className="w-2.5 h-2.5" />
+                          <span>Pay ₹{amt}</span>
+                        </button>
+                      </>
+                    )}
                   </div>
                 </div>
 
-                <div className="shrink-0 text-right">
-                  {isPaid ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-100">
-                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
-                      {status === "free" ? "मोफत" : "Paid"}
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 px-2 py-1 rounded-xl text-[10px] sm:text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-100">
-                      <Clock className="w-3 h-3 text-amber-600" />
-                      प्रलंबित
-                    </span>
-                  )}
-                </div>
               </div>
             );
           })
         )}
       </div>
+
+      {/* UPI Payment Modal */}
+      {activePayItem && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
+            
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+              <div>
+                <h3 className="text-sm font-black text-slate-900">
+                  फी भरा (UPI Payment)
+                </h3>
+                <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+                  {activePayItem.fullName} • <span className="font-mono text-orange-600 font-bold">{activePayItem.regId}</span>
+                </p>
+              </div>
+              <button 
+                onClick={() => setActivePayItem(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 text-center space-y-2.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                कोणत्याही UPI ॲपने स्कॅन करा
+              </span>
+
+              {upiId ? (
+                <img 
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data=${encodeURIComponent(getUpiDeepLink(activePayItem.amount, `${eventData?.title || 'Event'} - ${activePayItem.regId}`))}`} 
+                  alt="UPI QR Code" 
+                  className="w-44 h-44 mx-auto object-contain rounded-xl border border-slate-200 bg-white p-2 shadow-xs"
+                />
+              ) : (
+                <div className="w-44 h-44 mx-auto bg-white rounded-xl border border-dashed border-slate-300 flex flex-col items-center justify-center p-3 text-center">
+                  <QrCode className="w-10 h-10 text-slate-400 mb-1" />
+                  <span className="text-[11px] font-bold text-slate-600">JBSC अधिकृत QR</span>
+                </div>
+              )}
+
+              <div className="text-2xl font-black text-slate-900">
+                ₹{activePayItem.amount}
+              </div>
+
+              {upiId && (
+                <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
+                  <span className="font-mono text-slate-700 font-bold truncate">
+                    {upiId}
+                  </span>
+                  <button
+                    onClick={() => copyUpiId(upiId)}
+                    className="p-1 text-slate-400 hover:text-orange-600 transition"
+                    title="UPI ID कॉपी करा"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {upiId && (
+              <a
+                href={getUpiDeepLink(activePayItem.amount, `${eventData?.title || 'Event'} - ${activePayItem.regId}`)}
+                className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs shadow-xs transition active:scale-95"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>GPay / PhonePe / Paytm ने भरा</span>
+              </a>
+            )}
+
+            <p className="text-[10px] text-center text-slate-400 font-medium leading-relaxed">
+              पेमेंट झाल्यावर स्क्रीनशॉट जतन करा किंवा कमिटी सदस्यांना दाखवा.
+            </p>
+
+          </div>
+        </div>
+      )}
 
     </div>
   );
