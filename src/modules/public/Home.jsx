@@ -24,17 +24,21 @@ export default function Home() {
   const [liveEvent, setLiveEvent] = useState(null);
   const [isUpiModalOpen, setIsUpiModalOpen] = useState(false);
 
+  // 1. Fetch Live Event (Strictly isActive === true only)
   useEffect(() => {
     const fetchLiveEvent = async () => {
       try {
         const events = await getAllEvents();
         if (events && events.length > 0) {
-          // Firestore nusar isActive: true aslela event ghyava
-          const active = events.find(e => e.isActive === true) || events[0];
-          setLiveEvent(active);
+          // Fakt aani fakt isActive: true asel tarach ghyaycha, kontehi fallback 'events[0]' nako
+          const active = events.find(e => e.isActive === true);
+          setLiveEvent(active || null);
+        } else {
+          setLiveEvent(null);
         }
       } catch (err) {
         console.error("Live event load error:", err);
+        setLiveEvent(null);
       }
     };
     fetchLiveEvent();
@@ -220,37 +224,37 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2. Quick UPI Payment Widget (Live Card) */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
-        <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 text-white p-4 sm:p-5 rounded-3xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-orange-400/40">
-          <div className="flex items-center gap-3.5 text-center sm:text-left">
-            <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/20">
-              <QrCode className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <div className="flex items-center justify-center sm:justify-start gap-2">
-                <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full">
-                  थेट फी भरा
-                </span>
-                <span className="text-sm sm:text-base font-black">
-                  {liveEvent?.title || "दीपोत्सव २०२६"}
-                </span>
+      {/* 2. Quick Dynamic UPI Payment Widget (Fakt Event Active Aslyas Disel) */}
+      {liveEvent && liveEvent.isActive && upiId && (
+        <section className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
+          <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 text-white p-4 sm:p-5 rounded-3xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-orange-400/40">
+            <div className="flex items-center gap-3.5 text-center sm:text-left">
+              <div className="w-11 h-11 rounded-2xl bg-white/20 backdrop-blur-xs flex items-center justify-center shrink-0 border border-white/20">
+                <QrCode className="w-6 h-6 text-white" />
               </div>
-              <p className="text-xs text-orange-100 font-medium mt-0.5">
-                फॉर्म भरला आहे पण फी बाकी राहिली असल्यास थेट UPI किंवा QR कोडने भरा.
-              </p>
+              <div>
+                <div className="flex items-center justify-center sm:justify-start gap-2">
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-white/25 px-2 py-0.5 rounded-full">
+                    थेट फी भरा
+                  </span>
+                  <span className="text-sm sm:text-base font-black">{liveEvent.title}</span>
+                </div>
+                <p className="text-xs text-orange-100 font-medium mt-0.5">
+                  फॉर्म भरला आहे पण फी बाकी राहिली असल्यास थेट UPI किंवा QR कोडने भरा.
+                </p>
+              </div>
             </div>
-          </div>
 
-          <button
-            onClick={() => setIsUpiModalOpen(true)}
-            className="w-full sm:w-auto px-5 py-2.5 bg-white text-orange-600 hover:bg-orange-50 font-black text-xs sm:text-sm rounded-xl shadow-md transition transform active:scale-95 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
-          >
-            <CreditCard className="w-4 h-4" />
-            <span>QR कोड व UPI पेमेंट</span>
-          </button>
-        </div>
-      </section>
+            <button
+              onClick={() => setIsUpiModalOpen(true)}
+              className="w-full sm:w-auto px-5 py-2.5 bg-white text-orange-600 hover:bg-orange-50 font-black text-xs sm:text-sm rounded-xl shadow-md transition transform active:scale-95 shrink-0 flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>QR कोड व UPI पेमेंट</span>
+            </button>
+          </div>
+        </section>
+      )}
 
       {/* 3. Sankalp Section */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-10 pb-6">

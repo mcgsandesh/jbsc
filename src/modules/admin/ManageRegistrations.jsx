@@ -164,22 +164,28 @@ export default function ManageRegistrations() {
   }, [list, selectedEvent]);
 
   // 5. WhatsApp Link Builder
+  // WhatsApp Link Builder
   const getWhatsAppLink = (item) => {
     let mobile = String(item["Mobile"] || item["mobile"] || item["व्हॉट्सॲप नंबर (WhatsApp No)"] || "").replace(/[^0-9]/g, "");
     if (!mobile) return "#";
     if (mobile.length === 10) mobile = `91${mobile}`;
 
     const fullName = item["Full_Name"] || item["fullName"] || item["पूर्ण नाव (Full Name)"] || "सदस्य";
+    const regId = item["Reg_ID"] || item["regId"] || "-";
     const amt = item["Amount"] || selectedEvent?.baseAmount || 0;
     const status = String(item["Payment_Status"] || "Pending");
 
-    let msg = selectedEvent?.whatsappTemplate || "नमस्कार {name}, {event} नोंदणीसाठी धन्यवाद. फी: ₹{amount}, स्थिती: {status}.";
+    let msg = selectedEvent?.whatsappTemplate || "नमस्कार {name}, {event} नोंदणीसाठी धन्यवाद. Reg ID: {regId}, फी: ₹{amount}, स्थिती: {status}.";
+    
+    // प्लेसहोल्डर बदलणे (यात {regId} जोडले आहे)
     msg = msg
       .replace(/{name}/g, fullName)
       .replace(/{event}/g, selectedEvent?.title || "")
+      .replace(/{regId}/g, regId)
       .replace(/{amount}/g, String(amt))
       .replace(/{status}/g, status);
 
+    // encodeURIComponent आपोआप एंटर (Next line) चे रूपांतर व्हॉट्सॲप लिंक फॉरमॅटमध्ये करतो
     return `https://wa.me/${mobile}?text=${encodeURIComponent(msg)}`;
   };
 

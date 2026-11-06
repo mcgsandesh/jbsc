@@ -24,7 +24,7 @@ export default function Navbar() {
   const navLinks = [
     { name: "मुख्यपृष्ठ", path: "/", icon: Home },
     { name: "नोंदणी फॉर्म", path: "/register", icon: FileText },
-    { name: "सभासद यादी", path: "/public-list", icon: CheckCircle },
+    { name: "सहभाग यादी", path: "/public-list", icon: CheckCircle },
   ];
 
   const isActive = (path) => location.pathname === path;
