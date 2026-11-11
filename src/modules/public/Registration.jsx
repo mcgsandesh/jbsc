@@ -21,6 +21,8 @@ import { validateField } from "../../utils/validators";
 import { showError, showSuccess } from "../../utils/alert";
 import { APP_CONFIG } from "../../config/constants";
 
+import Boxt20Splash from "../../components/common/Boxt20Splash";
+
 export default function Registration() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
@@ -248,7 +250,7 @@ export default function Registration() {
         <AlertCircle className="w-12 h-12 text-slate-400 mx-auto mb-3" />
         <h2 className="text-xl font-bold text-slate-900">सध्या कोणतीही नोंदणी सुरू नाही</h2>
         <p className="text-sm text-slate-500 mt-2">
-          कमिटीकडून नवीन इव्हेंट सुरू झाल्यानंतर येथे फॉर्म उपलब्ध होईल.
+          कमिटकडून नवीन इव्हेंट सुरू झाल्यानंतर येथे फॉर्म उपलब्ध होईल.
         </p>
       </div>
     );
@@ -264,6 +266,7 @@ export default function Registration() {
 
     return (
       <div className="max-w-xl mx-auto my-6 px-4">
+        
         <div className="bg-white rounded-3xl border border-slate-200 p-6 sm:p-8 shadow-xl text-center space-y-6">
           <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 mx-auto">
             <CheckCircle2 className="w-9 h-9" />
@@ -343,279 +346,283 @@ export default function Registration() {
     );
   }
 
-  // ५. मुख्य नोंदणी फॉर्म UI (Responsive Desktop 2-Column + Mobile Fluid 1-Column)
+  // ५. मुख्य नोंदणी फॉर्म UI (Boxt20Splash सोबत Fragments ने जोडले)
   return (
-    <div className="w-full min-h-screen bg-slate-50 font-sans pb-16">
-      <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-8">
-        
-        {/* Desktop वर २-कॉलम आणि Mobile वर १-कॉलम ग्रिड */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-start">
+    <>
+      {/* १. BOXT20 5-Sec Splash Screen */}
+      <Boxt20Splash />
+
+      {/* २. मुख्य फॉर्म स्क्रीन */}
+      <div className="w-full min-h-screen bg-slate-50 font-sans pb-16">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-4 sm:pt-8">
           
-          {/* ================= डावी बाजू: इव्हेंट माहिती व बॅनर (Desktop वर कायम समोर राहील) ================= */}
-          <div className="lg:col-span-5 space-y-4">
+          {/* Desktop वर २-कॉलम आणि Mobile वर १-कॉलम ग्रिड */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-8 items-start">
             
-            {/* बॅनर व मुख्य कार्ड */}
-            <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
-              {selectedEvent?.bannerUrl && (
-                <div className="w-full h-36 sm:h-48 bg-slate-100 overflow-hidden">
-                  <img
-                    src={selectedEvent.bannerUrl}
-                    alt={selectedEvent.title}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-
-              <div className="p-4 sm:p-5 space-y-3">
-                {/* इव्हेंट निवड (एकापेक्षा जास्त असल्यास) */}
-                {events.length > 1 && (
-                  <div>
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
-                      इव्हेंट बदला
-                    </label>
-                    <select
-                      value={selectedEvent?.id}
-                      onChange={handleEventChange}
-                      className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-orange-500 cursor-pointer"
-                    >
-                      {events.map((ev) => (
-                        <option key={ev.id} value={ev.id}>
-                          {ev.title} ({ev.year})
-                        </option>
-                      ))}
-                    </select>
+            {/* ================= डावी बाजू: इव्हेंट माहिती व बॅनर ================= */}
+            <div className="lg:col-span-5 space-y-4">
+              
+              {/* बॅनर व मुख्य कार्ड */}
+              <div className="bg-white rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden">
+                {selectedEvent?.bannerUrl && (
+                  <div className="w-full h-36 sm:h-48 bg-slate-100 overflow-hidden">
+                    <img
+                      src={selectedEvent.bannerUrl}
+                      alt={selectedEvent.title}
+                      className="w-full h-full object-cover"
+                    />
                   </div>
                 )}
 
-                {/* शीर्षक व वर्ष बॅज */}
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1">
-                    <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200/60">
-                      वर्ष {selectedEvent?.year || 2026}
-                    </span>
-                    <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200/60">
-                      फी: ₹{selectedEvent?.baseAmount || 0}
-                    </span>
-                  </div>
-
-                  <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
-                    {selectedEvent?.title}
-                  </h1>
-                </div>
-
-                {/* तारीख आणि वेळ स्ट्रिप (सिंगल किंवा रेंज दोन्ही सपोर्ट) */}
-                <div className="flex items-center gap-2 bg-orange-50/70 border border-orange-200/60 p-2.5 rounded-2xl text-xs text-orange-950 font-bold">
-                  <Calendar className="w-4 h-4 text-orange-600 shrink-0" />
-                  <span className="truncate">{formatEventDateTime()}</span>
-                </div>
-
-                {/* नियम व माहिती: Desktop वर उघडी राहील, Mobile वर Collapsible Accordion */}
-                {selectedEvent?.description && (
-                  <div className="pt-1">
-                    {/* मोबाईलसाठी टॉगल बटण */}
-                    <button
-                      type="button"
-                      onClick={() => setShowRules(!showRules)}
-                      className="lg:hidden w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 border border-slate-200 transition cursor-pointer"
-                    >
-                      <div className="flex items-center gap-1.5 text-orange-600">
-                        <Info className="w-4 h-4" />
-                        <span>नियम व माहिती (पहा)</span>
-                      </div>
-                      {showRules ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                    </button>
-
-                    {/* माहिती बॉक्स (Desktop वर कायम दिसेल, मोबाईलवर टॉगलवर) */}
-                    <div className={`mt-2 lg:mt-0 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs text-slate-600 leading-relaxed whitespace-pre-line ${
-                      showRules ? "block" : "hidden lg:block"
-                    }`}>
-                      <div className="flex items-center gap-1.5 font-bold text-slate-900 mb-1.5">
-                        <ShieldCheck className="w-4 h-4 text-orange-600" />
-                        नियम व महत्त्वाच्या सूचना:
-                      </div>
-                      <p className="text-[11px] sm:text-xs text-slate-600">
-                        {selectedEvent.description}
-                      </p>
+                <div className="p-4 sm:p-5 space-y-3">
+                  {/* इव्हेंट निवड */}
+                  {events.length > 1 && (
+                    <div>
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+                        इव्हेंट बदला
+                      </label>
+                      <select
+                        value={selectedEvent?.id}
+                        onChange={handleEventChange}
+                        className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-800 bg-slate-50 outline-none focus:border-orange-500 cursor-pointer"
+                      >
+                        {events.map((ev) => (
+                          <option key={ev.id} value={ev.id}>
+                            {ev.title} ({ev.year})
+                          </option>
+                        ))}
+                      </select>
                     </div>
+                  )}
+
+                  {/* शीर्षक व वर्ष बॅज */}
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md bg-orange-50 text-orange-700 border border-orange-200/60">
+                        वर्ष {selectedEvent?.year || 2026}
+                      </span>
+                      <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-lg border border-emerald-200/60">
+                        फी: ₹{selectedEvent?.baseAmount || 0}
+                      </span>
+                    </div>
+
+                    <h1 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight leading-snug">
+                      {selectedEvent?.title}
+                    </h1>
                   </div>
-                )}
+
+                  {/* तारीख आणि वेळ स्ट्रिप */}
+                  <div className="flex items-center gap-2 bg-orange-50/70 border border-orange-200/60 p-2.5 rounded-2xl text-xs text-orange-950 font-bold">
+                    <Calendar className="w-4 h-4 text-orange-600 shrink-0" />
+                    <span className="truncate">{formatEventDateTime()}</span>
+                  </div>
+
+                  {/* नियम व माहिती */}
+                  {selectedEvent?.description && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => setShowRules(!showRules)}
+                        className="lg:hidden w-full flex items-center justify-between p-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 border border-slate-200 transition cursor-pointer"
+                      >
+                        <div className="flex items-center gap-1.5 text-orange-600">
+                          <Info className="w-4 h-4" />
+                          <span>नियम व माहिती (पहा)</span>
+                        </div>
+                        {showRules ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                      </button>
+
+                      <div className={`mt-2 lg:mt-0 p-3.5 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs text-slate-600 leading-relaxed whitespace-pre-line ${
+                        showRules ? "block" : "hidden lg:block"
+                      }`}>
+                        <div className="flex items-center gap-1.5 font-bold text-slate-900 mb-1.5">
+                          <ShieldCheck className="w-4 h-4 text-orange-600" />
+                          नियम व महत्त्वाच्या सूचना:
+                        </div>
+                        <p className="text-[11px] sm:text-xs text-slate-600">
+                          {selectedEvent.description}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
+
+            </div>
+
+            {/* ================= उजवी बाजू: सहभागी सदस्याचा फॉर्म ================= */}
+            <div className="lg:col-span-7">
+              <form 
+                onSubmit={handleSubmit} 
+                className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-7 shadow-sm space-y-4"
+              >
+                <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
+                  <div>
+                    <h2 className="text-base sm:text-lg font-black text-slate-900">
+                      सहभागी सदस्याची माहिती भरा
+                    </h2>
+                    <p className="text-[11px] text-slate-400 mt-0.5">
+                      सर्व आवश्यक माहिती अचूक भरा.
+                    </p>
+                  </div>
+                  <span className="text-[10px] text-rose-500 font-bold">* आवश्यक</span>
+                </div>
+
+                {/* डायनॅमिक फील्ड्स */}
+                {selectedEvent?.fields?.map((field) => {
+                  const hasError = Boolean(formErrors[field.id]);
+
+                  return (
+                    <div key={field.id} className="space-y-1">
+                      <label className="block text-xs font-bold text-slate-700">
+                        {field.label}{" "}
+                        {field.required && <span className="text-rose-500">*</span>}
+                      </label>
+
+                      {/* Short Text / Tel / Number */}
+                      {["text", "tel", "number"].includes(field.type) && (
+                        <input
+                          type={field.type}
+                          value={formData[field.id] || ""}
+                          onChange={(e) => handleInputChange(field.id, e.target.value)}
+                          placeholder={`${field.label} प्रविष्ट करा...`}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm transition focus:outline-none ${
+                            hasError
+                              ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
+                              : "border-slate-200 bg-slate-50/50 focus:bg-white focus:border-orange-500"
+                          }`}
+                        />
+                      )}
+
+                      {/* Paragraph / Textarea */}
+                      {field.type === "textarea" && (
+                        <textarea
+                          rows="2"
+                          value={formData[field.id] || ""}
+                          onChange={(e) => handleInputChange(field.id, e.target.value)}
+                          placeholder={`${field.label} सविस्तर लिहा...`}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm transition focus:outline-none ${
+                            hasError
+                              ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
+                              : "border-slate-200 bg-slate-50/50 focus:bg-white focus:border-orange-500"
+                          }`}
+                        />
+                      )}
+
+                      {/* Select Dropdown */}
+                      {field.type === "select" && (
+                        <select
+                          value={formData[field.id] || ""}
+                          onChange={(e) => handleInputChange(field.id, e.target.value)}
+                          className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm bg-white transition focus:outline-none cursor-pointer ${
+                            hasError
+                              ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
+                              : "border-slate-200 focus:border-orange-500"
+                          }`}
+                        >
+                          <option value="">-- पर्याय निवडा --</option>
+                          {field.options?.map((opt, i) => (
+                            <option key={i} value={opt}>
+                              {opt}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {/* Radio Group */}
+                      {field.type === "radio" && (
+                        <div className="grid grid-cols-2 gap-2 pt-0.5">
+                          {field.options?.map((opt, i) => {
+                            const isChecked = formData[field.id] === opt;
+                            return (
+                              <label
+                                key={i}
+                                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer text-xs font-bold transition ${
+                                  isChecked
+                                    ? "border-orange-500 bg-orange-50/60 text-orange-950"
+                                    : "border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100"
+                                }`}
+                              >
+                                <input
+                                  type="radio"
+                                  name={field.id}
+                                  value={opt}
+                                  checked={isChecked}
+                                  onChange={(e) => handleInputChange(field.id, e.target.value)}
+                                  className="w-3.5 h-3.5 text-orange-600 focus:ring-0"
+                                />
+                                <span>{opt}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Checkbox List */}
+                      {field.type === "checkbox" && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
+                          {field.options?.map((opt, i) => {
+                            const checked = (formData[field.id] || []).includes(opt);
+                            return (
+                              <label
+                                key={i}
+                                className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs font-bold transition ${
+                                  checked
+                                    ? "border-orange-500 bg-orange-50/50 text-orange-950"
+                                    : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  onChange={(e) => handleCheckboxChange(field.id, opt, e.target.checked)}
+                                  className="w-3.5 h-3.5 rounded text-orange-600 focus:ring-0"
+                                />
+                                <span>{opt}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Validation Error Message */}
+                      {hasError && (
+                        <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
+                          <AlertCircle className="w-3.5 h-3.5" />
+                          {formErrors[field.id]}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })}
+
+                {/* Submit Button */}
+                <div className="pt-3 border-t border-slate-100">
+                  <button
+                    type="submit"
+                    disabled={submitting}
+                    className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-black text-sm shadow-lg shadow-orange-600/20 transition disabled:opacity-50 cursor-pointer"
+                  >
+                    {submitting ? (
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <>
+                        <Send className="w-4 h-4" />
+                        <span>
+                          नोंदणी अर्ज सबमिट करा {selectedEvent?.baseAmount > 0 ? `(₹${selectedEvent.baseAmount})` : ""}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+
+              </form>
             </div>
 
           </div>
 
-          {/* ================= उजवी बाजू: सहभागी सदस्याचा फॉर्म (Mobile वर Zero Wastage) ================= */}
-          <div className="lg:col-span-7">
-            <form 
-              onSubmit={handleSubmit} 
-              className="bg-white rounded-3xl border border-slate-200/90 p-4 sm:p-7 shadow-sm space-y-4"
-            >
-              <div className="pb-3 border-b border-slate-100 flex items-center justify-between">
-                <div>
-                  <h2 className="text-base sm:text-lg font-black text-slate-900">
-                    सहभागी सदस्याची माहिती भरा
-                  </h2>
-                  <p className="text-[11px] text-slate-400 mt-0.5">
-                    सर्व आवश्यक माहिती अचूक भरा.
-                  </p>
-                </div>
-                <span className="text-[10px] text-rose-500 font-bold">* आवश्यक</span>
-              </div>
-
-              {/* डायनॅमिक फील्ड्स */}
-              {selectedEvent?.fields?.map((field) => {
-                const hasError = Boolean(formErrors[field.id]);
-
-                return (
-                  <div key={field.id} className="space-y-1">
-                    <label className="block text-xs font-bold text-slate-700">
-                      {field.label}{" "}
-                      {field.required && <span className="text-rose-500">*</span>}
-                    </label>
-
-                    {/* Short Text / Tel / Number */}
-                    {["text", "tel", "number"].includes(field.type) && (
-                      <input
-                        type={field.type}
-                        value={formData[field.id] || ""}
-                        onChange={(e) => handleInputChange(field.id, e.target.value)}
-                        placeholder={`${field.label} प्रविष्ट करा...`}
-                        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm transition focus:outline-none ${
-                          hasError
-                            ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
-                            : "border-slate-200 bg-slate-50/50 focus:bg-white focus:border-orange-500"
-                        }`}
-                      />
-                    )}
-
-                    {/* Paragraph / Textarea */}
-                    {field.type === "textarea" && (
-                      <textarea
-                        rows="2"
-                        value={formData[field.id] || ""}
-                        onChange={(e) => handleInputChange(field.id, e.target.value)}
-                        placeholder={`${field.label} सविस्तर लिहा...`}
-                        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm transition focus:outline-none ${
-                          hasError
-                            ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
-                            : "border-slate-200 bg-slate-50/50 focus:bg-white focus:border-orange-500"
-                        }`}
-                      />
-                    )}
-
-                    {/* Select Dropdown */}
-                    {field.type === "select" && (
-                      <select
-                        value={formData[field.id] || ""}
-                        onChange={(e) => handleInputChange(field.id, e.target.value)}
-                        className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm bg-white transition focus:outline-none cursor-pointer ${
-                          hasError
-                            ? "border-rose-400 bg-rose-50/30 focus:border-rose-500"
-                            : "border-slate-200 focus:border-orange-500"
-                        }`}
-                      >
-                        <option value="">-- पर्याय निवडा --</option>
-                        {field.options?.map((opt, i) => (
-                          <option key={i} value={opt}>
-                            {opt}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    {/* Radio Group (App Style Large Clickable Touch Cards) */}
-                    {field.type === "radio" && (
-                      <div className="grid grid-cols-2 gap-2 pt-0.5">
-                        {field.options?.map((opt, i) => {
-                          const isChecked = formData[field.id] === opt;
-                          return (
-                            <label
-                              key={i}
-                              className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer text-xs font-bold transition ${
-                                isChecked
-                                  ? "border-orange-500 bg-orange-50/60 text-orange-950"
-                                  : "border-slate-200 bg-slate-50/50 text-slate-600 hover:bg-slate-100"
-                              }`}
-                            >
-                              <input
-                                type="radio"
-                                name={field.id}
-                                value={opt}
-                                checked={isChecked}
-                                onChange={(e) => handleInputChange(field.id, e.target.value)}
-                                className="w-3.5 h-3.5 text-orange-600 focus:ring-0"
-                              />
-                              <span>{opt}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Checkbox List */}
-                    {field.type === "checkbox" && (
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-0.5">
-                        {field.options?.map((opt, i) => {
-                          const checked = (formData[field.id] || []).includes(opt);
-                          return (
-                            <label
-                              key={i}
-                              className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer text-xs font-bold transition ${
-                                checked
-                                  ? "border-orange-500 bg-orange-50/50 text-orange-950"
-                                  : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50"
-                              }`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={(e) => handleCheckboxChange(field.id, opt, e.target.checked)}
-                                className="w-3.5 h-3.5 rounded text-orange-600 focus:ring-0"
-                              />
-                              <span>{opt}</span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                    )}
-
-                    {/* Validation Error Message */}
-                    {hasError && (
-                      <p className="text-[11px] font-semibold text-rose-600 flex items-center gap-1 mt-0.5">
-                        <AlertCircle className="w-3.5 h-3.5" />
-                        {formErrors[field.id]}
-                      </p>
-                    )}
-                  </div>
-                );
-              })}
-
-              {/* Submit Button */}
-              <div className="pt-3 border-t border-slate-100">
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="w-full flex items-center justify-center gap-2 py-3.5 px-6 rounded-2xl bg-orange-600 hover:bg-orange-700 active:scale-98 text-white font-black text-sm shadow-lg shadow-orange-600/20 transition disabled:opacity-50 cursor-pointer"
-                >
-                  {submitting ? (
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <>
-                      <Send className="w-4 h-4" />
-                      <span>
-                        नोंदणी अर्ज सबमिट करा {selectedEvent?.baseAmount > 0 ? `(₹${selectedEvent.baseAmount})` : ""}
-                      </span>
-                    </>
-                  )}
-                </button>
-              </div>
-
-            </form>
-          </div>
-
         </div>
-
       </div>
-    </div>
+    </>
   );
 }

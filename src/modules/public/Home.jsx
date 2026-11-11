@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import { getAllEvents } from "../../services/eventService";
 import { showSuccess } from "../../utils/alert";
+import Boxt20Splash from "../../components/common/Boxt20Splash";
 
 export default function Home() {
   const base = import.meta.env.BASE_URL;
@@ -152,6 +153,8 @@ export default function Home() {
   ];
 
   return (
+    <> <Boxt20Splash />
+
     <div className="w-full font-sans pb-16 selection:bg-orange-500 selection:text-white">
       
       {/* 1. Hero Section */}
@@ -494,5 +497,7 @@ export default function Home() {
       </footer>
 
     </div>
+    </>
   );
+
 }

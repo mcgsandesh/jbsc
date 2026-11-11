@@ -12,6 +12,7 @@ import Events from "./modules/admin/Events";
 import Users from "./modules/admin/Users";
 import ManageRegistrations from "./modules/admin/ManageRegistrations"; // <-- हे इंपोर्ट करा
 import FinanceModule from "./modules/admin/FinanceModule";
+import Gallery from './modules/public/Gallery';
 
 export default function App() {
   return (
@@ -25,6 +26,7 @@ export default function App() {
           <Route path=":slug" element={<Registration />} />
           <Route path="public-list" element={<PublicList />} />
           <Route path="list/:slug" element={<PublicList />} />
+          <Route path="/gallery" element={<Gallery />} />
           <Route path="admin/login" element={<Login />} />
         </Route>
 

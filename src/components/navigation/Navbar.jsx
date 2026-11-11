@@ -9,6 +9,7 @@ import {
   Home, 
   FileText, 
   CheckCircle,
+  Images,
   LayoutDashboard 
 } from "lucide-react";
 import { APP_CONFIG } from "../../config/constants";
@@ -25,6 +26,7 @@ export default function Navbar() {
     { name: "मुख्यपृष्ठ", path: "/", icon: Home },
     { name: "नोंदणी फॉर्म", path: "/register", icon: FileText },
     { name: "सहभाग यादी", path: "/public-list", icon: CheckCircle },
+    { name: "आठवणी", path: "/gallery", icon: Images },
   ];
 
   const isActive = (path) => location.pathname === path;

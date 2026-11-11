@@ -164,7 +164,6 @@ export default function ManageRegistrations() {
   }, [list, selectedEvent]);
 
   // 5. WhatsApp Link Builder
-  // WhatsApp Link Builder
   const getWhatsAppLink = (item) => {
     let mobile = String(item["Mobile"] || item["mobile"] || item["व्हॉट्सॲप नंबर (WhatsApp No)"] || "").replace(/[^0-9]/g, "");
     if (!mobile) return "#";
@@ -199,35 +198,47 @@ export default function ManageRegistrations() {
     const regId = row["Reg_ID"] || row["regId"];
     const currentStatus = String(row["Payment_Status"] || "").toLowerCase();
     const isCurrentlyPaid = currentStatus === "paid" || currentStatus === "यशस्वी";
+    const currentAmt = Number(row["Amount"]) || Number(selectedEvent?.baseAmount) || 0;
 
+    // जर आधीच Paid असेल तर Pending करण्यासाठी विचारणे
     if (isCurrentlyPaid) {
       const confirmPending = await showConfirm(
         "पेमेंट बाकी करायचे?",
         `${regId} चे पेमेंट पुन्हा 'Pending' म्हणून चिन्हांकित करायचे आहे का?`
       );
       if (confirmPending) {
-        executePaymentUpdate(regId, "Pending", "-", index);
+        // थेट 'Pending' म्हणून executeUpdate पाठवणे
+        await executePaymentUpdate(regId, "Pending", "-", index, currentAmt);
       }
       return;
     }
 
+    // Modal उघडताना रक्कम संख्या स्वरूपात स्टेटमध्ये सेट करणे
     setPaymentModalData({
       regId,
       fullName: row["Full_Name"] || row["fullName"] || "सदस्य",
-      amount: row["Amount"] || selectedEvent?.baseAmount || 0,
+      amount: currentAmt,
       index
     });
   };
 
-  // Actual Payment Update Function
-  const executePaymentUpdate = async (regId, newStatus, paymentMode, index) => {
+  // Actual Payment Update Function (With Auto-Refresh Sync)
+  const executePaymentUpdate = async (regId, newStatus, paymentMode, index, finalAmount) => {
+    const updatedAmount = Number(finalAmount) || 0;
+
+    // १. लोकल स्टेट तात्काळ अपडेट (Instant UI)
     const updated = [...list];
-    updated[index]["Payment_Status"] = newStatus;
-    updated[index]["Payment_Mode"] = paymentMode;
-    setList(updated);
+    if (updated[index]) {
+      updated[index]["Payment_Status"] = newStatus;
+      updated[index]["Payment_Mode"] = paymentMode;
+      updated[index]["Amount"] = updatedAmount;
+      setList(updated);
+    }
+
     setUpdatingId(regId);
     setPaymentModalData(null);
 
+    // २. Google Sheet Sync
     try {
       const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
       if (scriptUrl) {
@@ -238,32 +249,43 @@ export default function ManageRegistrations() {
           body: JSON.stringify({
             action: "updatePayment",
             Event_Title: selectedEvent.title,
-            regId: regId,
-            newStatus: newStatus,
+            regId: String(regId).trim(),
+            newStatus: newStatus, // "Paid" किंवा "Pending"
             paymentMode: paymentMode,
+            amount: updatedAmount,
             updatedBy: currentUser?.name || currentUser?.email || "Desk Admin"
           }),
         });
+
+        // ३. Google Sheet ला राइट होण्यासाठी १ सेकंदाचा अवकाश देऊन Auto-Refresh
+        setTimeout(() => {
+          fetchSheetData(false);
+        }, 1200);
       }
-      showSuccess("यशस्वी", `${regId} चे पेमेंट ${newStatus} (${paymentMode}) नोंदवले गेले.`);
+      showSuccess("यशस्वी", `${regId} चे पेमेंट ${newStatus} (₹${updatedAmount}) नोंदवले गेले.`);
     } catch (err) {
       console.error(err);
       showError("त्रुटी", "Sheet मध्ये अपडेट करताना अडचण आली.");
+      fetchSheetData(false);
     } finally {
       setUpdatingId(null);
     }
   };
 
-  // Food Status Toggle (Served / Pending)
+  // Food Status Toggle (Served / Pending) (With Auto-Refresh Sync)
   const handleToggleFood = async (regId, currentFoodStatus, index) => {
     const isCurrentlyServed = String(currentFoodStatus || "").toLowerCase() === "served";
     const newStatus = isCurrentlyServed ? "Pending" : "Served";
 
+    // १. लोकल स्टेट तात्काळ अपडेट
     const updated = [...list];
-    updated[index]["Food_Status"] = newStatus;
-    setList(updated);
+    if (updated[index]) {
+      updated[index]["Food_Status"] = newStatus;
+      setList(updated);
+    }
     setUpdatingFoodId(regId);
 
+    // २. Google Sheet Sync
     try {
       const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
       if (scriptUrl) {
@@ -274,16 +296,22 @@ export default function ManageRegistrations() {
           body: JSON.stringify({
             action: "updateFoodStatus",
             Event_Title: selectedEvent.title,
-            regId: regId,
+            regId: String(regId).trim(),
             newFoodStatus: newStatus,
             servedBy: currentUser?.name || currentUser?.email || "Volunteer"
           }),
         });
+
+        // ३. Google Sheet वरून डेटा आपोआप परत मिळवणे (Auto-Refresh)
+        setTimeout(() => {
+          fetchSheetData(false);
+        }, 1200);
       }
       showSuccess("अपडेट", `${regId} चे जेवण स्थिती: ${newStatus === "Served" ? "मिळाले (Served)" : "बाकी"}`);
     } catch (err) {
       console.error(err);
       showError("त्रुटी", "Sheet मध्ये जेवण स्थिती सेव्ह करता आली नाही.");
+      fetchSheetData(false);
     } finally {
       setUpdatingFoodId(null);
     }
@@ -310,7 +338,7 @@ export default function ManageRegistrations() {
     });
   };
 
-  // Save Edit Details (Local + Live Google Sheet Sync)
+  // Save Edit Details (Local + Live Google Sheet Sync + Auto Refresh)
   const handleSaveEditMember = async (e) => {
     e.preventDefault();
     if (!editModalData) return;
@@ -323,23 +351,20 @@ export default function ManageRegistrations() {
     setSavingEdit(true);
     const { index, regId, fullName, mobile, food } = editModalData;
 
-    // 1. Instant Local State Update
+    // १. लोकल स्टेट अपडेट
     const updated = [...list];
     const targetRow = { ...updated[index] };
 
-    // Set name fields
     if ("Full_Name" in targetRow) targetRow["Full_Name"] = fullName;
     else if ("fullName" in targetRow) targetRow["fullName"] = fullName;
     else if ("पूर्ण नाव (Full Name)" in targetRow) targetRow["पूर्ण नाव (Full Name)"] = fullName;
     else targetRow["Full_Name"] = fullName;
 
-    // Set mobile fields
     if ("Mobile" in targetRow) targetRow["Mobile"] = mobile;
     else if ("mobile" in targetRow) targetRow["mobile"] = mobile;
     else if ("व्हॉट्सॲप नंबर (WhatsApp No)" in targetRow) targetRow["व्हॉट्सॲप नंबर (WhatsApp No)"] = mobile;
     else targetRow["Mobile"] = mobile;
 
-    // Set food fields
     let foodUpdated = false;
     for (let key in targetRow) {
       const lower = key.toLowerCase();
@@ -356,7 +381,7 @@ export default function ManageRegistrations() {
     updated[index] = targetRow;
     setList(updated);
 
-    // 2. Background Google Sheet Update
+    // २. Google Sheet Sync
     try {
       const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
       if (scriptUrl) {
@@ -367,19 +392,25 @@ export default function ManageRegistrations() {
           body: JSON.stringify({
             action: "editRegistration",
             Event_Title: selectedEvent.title,
-            regId: regId,
+            regId: String(regId).trim(),
             fullName: fullName,
             mobile: mobile,
             food: food,
             updatedBy: currentUser?.name || currentUser?.email || "Superadmin"
           }),
         });
+
+        // ३. Auto-Refresh
+        setTimeout(() => {
+          fetchSheetData(false);
+        }, 1200);
       }
       showSuccess("बदल जतन झाले!", `${regId} ची माहिती (नाव/मोबाईल/जेवण) यशस्वीरित्या अपडेट झाली.`);
       setEditModalData(null);
     } catch (err) {
       console.error(err);
       showError("त्रुटी", "Sheet मध्ये माहिती अपडेट करताना अडचण आली.");
+      fetchSheetData(false);
     } finally {
       setSavingEdit(false);
     }
@@ -834,14 +865,15 @@ export default function ManageRegistrations() {
         )}
       </div>
 
-      {/* Payment Mode Selector Modal */}
+      {/* Payment Mode Selector Modal (Editable Amount Support) */}
       {paymentModalData && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
+            
             <div className="flex items-center justify-between pb-2 border-b border-slate-100">
               <div>
                 <h3 className="text-sm font-black text-slate-900">
-                  पेमेंट पद्धत निवडा (Payment Mode)
+                  पेमेंट पद्धत व रक्कम पडताळणी
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                   {paymentModalData.fullName} • <span className="font-mono text-orange-600 font-bold">{paymentModalData.regId}</span>
@@ -855,34 +887,59 @@ export default function ManageRegistrations() {
               </button>
             </div>
 
-            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-200 text-center">
-              <span className="text-[10px] font-bold text-slate-400 uppercase">गोळा करायची रक्कम</span>
-              <div className="text-2xl font-black text-slate-900 mt-0.5">
-                ₹{paymentModalData.amount}
+            {/* Editable Amount Input Box */}
+            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
+              <label className="text-[11px] font-bold text-slate-600 block mb-1">
+                जमा झालेली एकूण रक्कम (₹)
+              </label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-base font-black text-slate-400">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  min="0"
+                  value={paymentModalData.amount}
+                  onChange={(e) => setPaymentModalData({ ...paymentModalData, amount: e.target.value })}
+                  className="w-full bg-white border border-slate-300 rounded-xl pl-8 pr-3 py-2 text-xl font-black text-slate-900 outline-none focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 font-mono"
+                  placeholder="0"
+                />
               </div>
+              <p className="text-[10px] text-slate-400 font-medium mt-1">
+                * सदस्याने स्वेच्छेने जास्त वर्गणी/देणगी दिली असल्यास रक्कम बदलून नोंदवा.
+              </p>
             </div>
 
+            {/* Payment Mode Selection Buttons */}
             <div className="grid grid-cols-2 gap-2.5 pt-1">
+              {/* Option 1: UPI */}
               <button
-                onClick={() => executePaymentUpdate(paymentModalData.regId, "Paid", "UPI", paymentModalData.index)}
+                type="button"
+                onClick={() => executePaymentUpdate(paymentModalData.regId, "Paid", "UPI", paymentModalData.index, paymentModalData.amount)}
                 className="p-3.5 rounded-2xl bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 hover:border-blue-600 transition flex flex-col items-center justify-center gap-1.5 group cursor-pointer active:scale-95 shadow-xs"
               >
                 <div className="w-9 h-9 rounded-xl bg-blue-100 group-hover:bg-blue-500 flex items-center justify-center transition">
                   <CreditCard className="w-5 h-5 text-blue-600 group-hover:text-white" />
                 </div>
                 <span className="text-xs font-black tracking-tight">UPI / Online</span>
-                <span className="text-[9px] text-blue-500 group-hover:text-blue-100 font-semibold">QR / GPay / PhonePe</span>
+                <span className="text-[10px] font-black text-blue-800 group-hover:text-blue-100 font-mono">
+                  ₹{Number(paymentModalData.amount) || 0}
+                </span>
               </button>
 
+              {/* Option 2: Cash */}
               <button
-                onClick={() => executePaymentUpdate(paymentModalData.regId, "Paid", "Cash", paymentModalData.index)}
+                type="button"
+                onClick={() => executePaymentUpdate(paymentModalData.regId, "Paid", "Cash", paymentModalData.index, paymentModalData.amount)}
                 className="p-3.5 rounded-2xl bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white border border-amber-200 hover:border-amber-600 transition flex flex-col items-center justify-center gap-1.5 group cursor-pointer active:scale-95 shadow-xs"
               >
                 <div className="w-9 h-9 rounded-xl bg-amber-100 group-hover:bg-amber-500 flex items-center justify-center transition">
                   <Banknote className="w-5 h-5 text-amber-600 group-hover:text-white" />
                 </div>
                 <span className="text-xs font-black tracking-tight">Cash (रोख)</span>
-                <span className="text-[9px] text-amber-500 group-hover:text-amber-100 font-semibold">हातात रोख मिळाली</span>
+                <span className="text-[10px] font-black text-amber-800 group-hover:text-amber-100 font-mono">
+                  ₹{Number(paymentModalData.amount) || 0}
+                </span>
               </button>
             </div>
 
@@ -895,6 +952,7 @@ export default function ManageRegistrations() {
                 रद्द करा
               </button>
             </div>
+
           </div>
         </div>
       )}
