@@ -142,10 +142,54 @@ export default function Registration() {
     handleInputChange(fieldId, updated);
   };
 
+  // १. नावाचे Proper Case (Title Case) करणारे फंक्शन
+  const toProperCase = (str) => {
+    return String(str || "")
+      .trim()
+      .replace(/\s+/g, " ") // मधल्या जास्तीच्या रिकाम्या जागा काढणे
+      .toLowerCase()
+      .split(" ")
+      .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(" ");
+  };
+
+  // २. नाव व मोबाईल ओळखून डुप्लिकेट तपासणारा हेल्पर
+  const checkDuplicateEntry = async (scriptUrl, eventTitle, cleanName, cleanMobile) => {
+    try {
+      const res = await fetch(`${scriptUrl}?sheet=${encodeURIComponent(eventTitle)}`);
+      const result = await res.json();
+      if (result && result.status === "success" && Array.isArray(result.data)) {
+        const targetName = cleanName.toLowerCase().trim();
+        const targetMob = cleanMobile.replace(/\D/g, "").slice(-10);
+
+        return result.data.find((row) => {
+          const rowName = String(
+            row["Full_Name"] || row["fullName"] || row["पूर्ण नाव (Full Name)"] || row["नाव"] || ""
+          )
+            .toLowerCase()
+            .replace(/\s+/g, " ")
+            .trim();
+
+          const rowMob = String(
+            row["Mobile"] || row["mobile"] || row["व्हॉट्सॲप नंबर (WhatsApp No)"] || ""
+          )
+            .replace(/\D/g, "")
+            .slice(-10);
+
+          // नाव आणि मोबाईल दोन्ही सेम असतील तरच डुप्लिकेट मानावे (फॅमिली मेंबरसाठी फक्त मोबाईल सेम चालू शकेल)
+          return rowName === targetName && rowMob === targetMob && targetMob.length === 10;
+        });
+      }
+    } catch (e) {
+      console.warn("Duplicate pre-check skipped:", e);
+    }
+    return null;
+  };
+
   // २. फॉर्म सबमिशन व व्हॅलिडेशन
-  const handleSubmit = async (e) => {
+const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!selectedEvent) return;
+    if (!selectedEvent || submitting) return; // डबल सबमिट रोखण्यासाठी सुरक्षा
 
     const errors = {};
 
@@ -181,11 +225,63 @@ export default function Registration() {
       const uniqueRegId = `REG_${Date.now().toString().slice(-6)}`;
       const finalAmount = Number(selectedEvent.baseAmount || 0);
 
+      // डायनॅमिक फील्ड्स प्रोसेस करणे + नावाचे Proper Case करणे
       const dynamicFieldsData = {};
+      let detectedFullName = "";
+      let detectedMobile = "";
+
       selectedEvent.fields?.forEach((f) => {
         const cleanLabel = f.label.replace(/[:\\/?*\[\]]/g, "").trim();
-        dynamicFieldsData[cleanLabel] = formData[f.id] !== undefined ? formData[f.id] : "";
+        let val = formData[f.id] !== undefined ? formData[f.id] : "";
+
+        const lowerLabel = cleanLabel.toLowerCase();
+        const lowerId = String(f.id || "").toLowerCase();
+
+        // जर फील्ड नावाचे असेल तर त्याला Proper Case मध्ये बदलणे
+        if (
+          lowerId.includes("name") ||
+          lowerLabel.includes("name") ||
+          lowerLabel.includes("नाव")
+        ) {
+          val = toProperCase(val);
+          if (!detectedFullName) detectedFullName = val;
+        }
+
+        // मोबाईल नंबर पकडणे
+        if (
+          f.type === "tel" ||
+          lowerId.includes("mobile") ||
+          lowerLabel.includes("mobile") ||
+          lowerLabel.includes("व्हॉट्सॲप") ||
+          lowerLabel.includes("मोबाईल")
+        ) {
+          detectedMobile = String(val).trim();
+        }
+
+        dynamicFieldsData[cleanLabel] = val;
       });
+
+      const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
+
+      // ३. डुप्लिकेट तपासणी: Same Name + Same Mobile असेल तर SweetAlert वॉर्निंग देणे
+      if (scriptUrl && detectedFullName && detectedMobile) {
+        const existingEntry = await checkDuplicateEntry(
+          scriptUrl,
+          selectedEvent.title,
+          detectedFullName,
+          detectedMobile
+        );
+
+        if (existingEntry) {
+          const existingRegId = existingEntry["Reg_ID"] || existingEntry["regId"] || "";
+          setSubmitting(false);
+          showError(
+            "नोंदणी आधीच झाली आहे! ⚠️",
+            `${detectedFullName} (${detectedMobile}) यांची नोंदणी या इव्हेंटसाठी आधीच पूर्ण झाली आहे (Reg ID: ${existingRegId}).\n\nजर तुम्ही कुटुंबातील इतर सदस्याची नोंदणी करत असाल, तर कृपया त्यांचे नाव टाका.`
+          );
+          return; // सबमिशन इथेच थांबवणे
+        }
+      }
 
       const submissionPayload = {
         Timestamp: new Date().toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }),
@@ -195,8 +291,6 @@ export default function Registration() {
         Payment_Status: finalAmount > 0 ? "Pending" : "Free",
         ...dynamicFieldsData,
       };
-
-      const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
 
       if (scriptUrl) {
         await fetch(scriptUrl, {
@@ -212,10 +306,10 @@ export default function Registration() {
       setSubmittedData({
         regId: uniqueRegId,
         amount: finalAmount,
-        fullName: formData.fullName || Object.values(formData)[0] || "सहभागी सदस्य",
+        fullName: detectedFullName || "सहभागी सदस्य",
       });
 
-      showSuccess("नोंदणी यशस्वी!", "आपला अर्ज स्वीकारण्यात आला आहे.");
+      showSuccess("नोंदणी यशस्वी!", `${detectedFullName} यांचा अर्ज स्वीकारण्यात आला आहे.`);
     } catch (err) {
       console.error(err);
       showError("सबमिशन अयशस्वी", "तांत्रिक अडचण आली आहे. पुन्हा प्रयत्न करा.");
@@ -449,6 +543,9 @@ export default function Registration() {
               </div>
 
             </div>
+
+                  
+
 
             {/* ================= उजवी बाजू: सहभागी सदस्याचा फॉर्म ================= */}
             <div className="lg:col-span-7">

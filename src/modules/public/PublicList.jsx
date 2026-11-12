@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { getAllEvents } from "../../services/eventService";
 import { showError, showSuccess } from "../../utils/alert";
+import DigitalPassModal from "../../components/common/DigitalPassModal";
 
 export default function PublicList() {
   const { slug } = useParams();
@@ -33,6 +34,7 @@ export default function PublicList() {
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [activePayItem, setActivePayItem] = useState(null);
+  const [selectedPassMember, setSelectedPassMember] = useState(null);
 
   const fetchListData = async (showLoader = true) => {
     if (showLoader) setLoading(true);
@@ -341,8 +343,8 @@ export default function PublicList() {
                   </span>
                 </div>
 
-                {/* 2nd Row: Meal Badge (Left) & Status / Pay Button (Right) */}
-                <div className="flex items-center justify-between gap-2 pt-0.5 border-t border-slate-50">
+                {/* 2nd Row: Meal Badge (Left) & QR Pass + Status / Pay Button (Right) */}
+                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-50">
                   {/* Left: Food Badge */}
                   <div>
                     {foodType ? (
@@ -363,8 +365,18 @@ export default function PublicList() {
                     )}
                   </div>
 
-                  {/* Right: Payment Status / Pay Button */}
+                  {/* Right: QR Pass Button + Payment Status / Pay Button */}
                   <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPassMember(row)}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-slate-900 hover:bg-slate-800 text-white text-[10px] font-bold transition active:scale-95 cursor-pointer"
+                      title="डिजिटल QR पास पहा"
+                    >
+                      <QrCode className="w-3 h-3 text-orange-400" />
+                      <span>QR पास</span>
+                    </button>
+
                     {isPaid ? (
                       <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                         <CheckCircle2 className="w-3 h-3 text-emerald-600" />
@@ -473,6 +485,13 @@ export default function PublicList() {
           </div>
         </div>
       )}
+
+      {/* डिजिटल QR प्रवेश व जेवण पास मोडल */}
+      <DigitalPassModal
+        member={selectedPassMember}
+        eventTitle={eventData?.title}
+        onClose={() => setSelectedPassMember(null)}
+      />
 
     </div>
   );

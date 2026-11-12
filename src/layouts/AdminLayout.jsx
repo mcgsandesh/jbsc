@@ -10,7 +10,9 @@ import {
   LogOut, 
   Menu, 
   X,
-  ExternalLink
+  ExternalLink,
+  QrCode,
+  Gift
 } from "lucide-react";
 import { logoutUser } from "../services/authService";
 import { APP_CONFIG } from "../config/constants";
@@ -49,30 +51,27 @@ export default function AdminLayout() {
   const isDesk = userRole === "desk_admin" || userRole === "desk";
 
   // 4. Tested Role Permissions
-  // - Volunteer: Fakt Registrations
-  // - Desk Admin: Dashboard + Registrations (Paid/Unpaid check)
-  // - Finance Admin: Dashboard + Registrations + Finance (Jama-Kharch)
-  // - Superadmin: All 5 options
   const perms = {
     canViewDashboard: isSuperAdmin || isFinance || isDesk,
     canManageEvents: isSuperAdmin,
     canViewRegistrations: true, // Sagle 4 roles nondani pahil/hajeri lavtil
-    canManageFinance: isSuperAdmin || isFinance, // Fakt Superadmin aani Finance Admin
-    canManageUsers: isSuperAdmin, // Fakt Superadmin
+    canScanQr: true, // Sagle 4 roles (Volunteers sahit) QR pass scan karu shaktil
+    canManageFinance: isSuperAdmin || isFinance,
+    canManageUsers: isSuperAdmin,
   };
 
-  // 5. Central Route Protection (Direct URL type kelyas adavne)
+  // 5. Central Route Protection
   const routePermissions = {
     "/admin/dashboard": perms.canViewDashboard,
     "/admin/events": perms.canManageEvents,
     "/admin/finance": perms.canManageFinance,
     "/admin/users": perms.canManageUsers,
     "/admin/registrations": perms.canViewRegistrations,
+    "/admin/scanner": perms.canScanQr,
   };
 
   const currentPath = location.pathname;
 
-  // Jar parwangi naslelya URL var gela tar direct registrations var pathva
   if (routePermissions[currentPath] === false) {
     return <Navigate to="/admin/registrations" replace />;
   }
@@ -83,13 +82,15 @@ export default function AdminLayout() {
     navigate("/admin/login");
   };
 
-  // 6. Navigation Menu Items
+  // 6. Navigation Menu Items (Desktop Sidebar & Mobile Bottom Bar)
   const navItems = [
     ...(perms.canViewDashboard ? [{ label: "डॅशबोर्ड", path: "/admin/dashboard", icon: LayoutDashboard }] : []),
     ...(perms.canManageEvents ? [{ label: "इव्हेंट्स", path: "/admin/events", icon: CalendarDays }] : []),
     { label: "नोंदणी", path: "/admin/registrations", icon: FileText },
+    { label: "QR स्कॅन", path: "/admin/scanner", icon: QrCode },
     ...(perms.canManageFinance ? [{ label: "जमा-खर्च", path: "/admin/finance", icon: IndianRupee }] : []),
     ...(perms.canManageUsers ? [{ label: "परवानगी", path: "/admin/users", icon: Users }] : []),
+    ...(perms.canManageEvents ? [{ label: "लकी ड्रॉ", path: "/admin/lucky-draw", icon: Gift }] : []),
   ];
 
   const isActive = (path) => location.pathname === path;

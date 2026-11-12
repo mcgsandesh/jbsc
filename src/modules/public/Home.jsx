@@ -18,6 +18,7 @@ import {
 import { getAllEvents } from "../../services/eventService";
 import { showSuccess } from "../../utils/alert";
 import Boxt20Splash from "../../components/common/Boxt20Splash";
+import LiveDrawBanner from "../../components/common/LiveDrawBanner";
 
 export default function Home() {
   const base = import.meta.env.BASE_URL;
@@ -226,7 +227,7 @@ export default function Home() {
           </div>
         </div>
       </section>
-
+<LiveDrawBanner/>
       {/* 2. Quick Dynamic UPI Payment Widget (Fakt Event Active Aslyas Disel) */}
       {liveEvent && liveEvent.isActive && upiId && (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative z-20">

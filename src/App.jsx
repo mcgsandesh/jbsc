@@ -13,6 +13,8 @@ import Users from "./modules/admin/Users";
 import ManageRegistrations from "./modules/admin/ManageRegistrations"; // <-- हे इंपोर्ट करा
 import FinanceModule from "./modules/admin/FinanceModule";
 import Gallery from './modules/public/Gallery';
+import QrScanner from "./modules/admin/QrScanner";
+import LuckyDrawAdmin from "./modules/admin/LuckyDrawAdmin";
 
 export default function App() {
   return (
@@ -36,6 +38,8 @@ export default function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="events" element={<Events />} />
           <Route path="registrations" element={<ManageRegistrations />} /> {/* <-- नवीन ॲडमिन रूट */}
+          <Route path="scanner" element={<QrScanner/>} />
+          <Route path="lucky-draw" element={<LuckyDrawAdmin/>} />
           <Route path="finance" element={<FinanceModule />} />
           <Route path="users" element={<Users />} />
         </Route>
