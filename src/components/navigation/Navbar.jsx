@@ -15,6 +15,7 @@ import {
 import { APP_CONFIG } from "../../config/constants";
 import { useAuth } from "../../context/AuthContext";
 
+
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
@@ -37,10 +38,11 @@ export default function Navbar() {
     : "/admin/dashboard";
 
   return (
+
     <header className="sticky top-0 z-40 w-full bg-white/95 backdrop-blur border-b border-gray-200 shadow-sm">
       <div className="w-full px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          
+
           {/* Logo & Club Name */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">

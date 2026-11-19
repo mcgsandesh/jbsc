@@ -15,7 +15,7 @@ const firebaseConfig = {
 };
 
 // Double initialization टाळण्यासाठी
-const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
+export const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

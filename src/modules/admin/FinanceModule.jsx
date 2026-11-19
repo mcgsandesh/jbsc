@@ -340,7 +340,8 @@ export default function FinanceModule() {
                     clubName: "जागेवाला बाबा स्पोर्ट्स क्लब",
                     eventTitle: selectedEventId === "ALL" ? "सर्व इव्हेंट्स एकत्रित पत्रक" : (activeEventObj?.title || "दीपोत्सव २०२६"),
                     year: activeEventObj?.year || "२०२६",
-                    transactions: filteredTransactions
+                    transactions: filteredTransactions,
+                    selectedEventId: selectedEventId // हा पॅरामीटर जोडणे
                   });
                 }}
                 className="p-2 sm:px-3 sm:py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold transition flex items-center gap-1.5 cursor-pointer active:scale-95"

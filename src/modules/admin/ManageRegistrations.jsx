@@ -16,7 +16,9 @@ import {
   CreditCard, 
   Banknote, 
   X,
-  Pencil
+  Pencil,
+  Shirt,
+  Tag
 } from "lucide-react";
 import { getAllEvents } from "../../services/eventService";
 import { showError, showSuccess, showConfirm } from "../../utils/alert";
@@ -40,7 +42,7 @@ export default function ManageRegistrations() {
   // Payment Mode Selector State (UPI vs Cash Modal)
   const [paymentModalData, setPaymentModalData] = useState(null);
 
-  // Superadmin Edit Member Modal State
+  // Superadmin Dynamic Edit Member Modal State
   const [editModalData, setEditModalData] = useState(null);
   const [savingEdit, setSavingEdit] = useState(false);
 
@@ -97,7 +99,58 @@ export default function ManageRegistrations() {
     }
   }, [selectedEvent]);
 
-  // 3. Food Type Helper
+  // 3. Smart User Input Dynamic Badges (Column G सह युझरने फॉर्ममध्ये भरलेला सर्व डेटा दाखवणे, ॲडमिन लॉग्स व सिस्टम कीज गाळणे)
+  const getDynamicBadges = (row) => {
+    const badges = [];
+    const excludedKeys = [
+      "reg_id", "regid", "timestamp", "full_name", "fullname", "पूर्ण नाव (Full Name)", 
+      "नाव", "name", "mobile", "phone", "whatsapp", "व्हॉट्सॲप नंबर (WhatsApp No)", "amount", 
+      "payment_status", "payment_mode", "food_status", "paymentstatus", "paymentmode", 
+      "foodstatus", "updatedat", "updatedby", "createdat", "createdby", "food_served_at", 
+      "food_served_by", "payment_time", "payment_updated_by", "event_title", "eventtitle",
+      "updatedby", "recordedby"
+    ];
+
+    for (let key in row) {
+      const lowerKey = String(key).toLowerCase().trim().replace(/[\s_]+/g, "");
+      const val = String(row[key] || "").trim();
+
+      if (!val) continue;
+
+      // सिस्टीम कीज, मोबाईल नंबर किंवा तारीख असलेले लॉग्ज गाळणे
+      const isExcluded = excludedKeys.some(ex => lowerKey.includes(ex));
+      if (isExcluded) continue;
+
+      if (
+        val.match(/^\d{2}\/\d{2}\/\d{4}/) ||
+        val.match(/^\d{4}-\d{2}-\d{2}/) ||
+        val.replace(/\D/g, "").length === 10
+      ) {
+        continue;
+      }
+
+      let badgeColor = "bg-amber-50 text-amber-800 border-amber-200";
+      let IconComponent = Tag;
+
+      if (lowerKey.includes("food") || lowerKey.includes("जेवण") || lowerKey.includes("meal")) {
+        if (val.toLowerCase().includes("non") || val.includes("नॉन")) {
+          badgeColor = "bg-rose-50 text-rose-700 border-rose-200";
+          IconComponent = Drumstick;
+        } else {
+          badgeColor = "bg-emerald-50 text-emerald-700 border-emerald-200";
+          IconComponent = Salad;
+        }
+      } else if (lowerKey.includes("shirt") || lowerKey.includes("tshirt") || lowerKey.includes("टी-शर्ट") || lowerKey.includes("size")) {
+        badgeColor = "bg-blue-50 text-blue-700 border-blue-200";
+        IconComponent = Shirt;
+      }
+
+      // Column G किंवा इतर सर्व कस्टम फील्ड्स (उदा. मैदानावर तुमची ओळख काय: Batsman) स्पष्ट दाखवणे
+      badges.push({ key, label: `${key}: ${val}`, color: badgeColor, Icon: IconComponent });
+    }
+    return badges;
+  };
+
   const getFoodType = (item) => {
     for (let key in item) {
       const lowerKey = key.toLowerCase();
@@ -108,15 +161,10 @@ export default function ManageRegistrations() {
         return item[key];
       }
     }
-    for (let key in item) {
-      const val = String(item[key] || "").toLowerCase();
-      if (val === "non-veg" || val === "non veg" || val === "नॉनव्हेज") return "Non-Veg";
-      if (val === "veg" || val === "व्हेज" || val === "शाकाहारी") return "Veg";
-    }
     return null;
   };
 
-  // 4. Summary Stats Calculation
+  // 4. Summary Stats Calculation & Dynamic Field Detection
   const stats = useMemo(() => {
     let vegCount = 0;
     let nonVegCount = 0;
@@ -127,10 +175,28 @@ export default function ManageRegistrations() {
     let upiCount = 0;
     let cashCount = 0;
 
+    let hasFoodField = false;
+    let tshirtSizes = {};
+
     list.forEach((item) => {
-      const food = getFoodType(item);
-      if (food === "Veg") vegCount++;
-      if (food === "Non-Veg") nonVegCount++;
+      for (let key in item) {
+        const lowerKey = key.toLowerCase();
+        const val = String(item[key] || "").trim();
+        if (lowerKey.includes("food") || lowerKey.includes("जेवण") || lowerKey.includes("meal")) {
+          hasFoodField = true;
+          const lowerVal = val.toLowerCase();
+          if (lowerVal.includes("non") || lowerVal.includes("नॉन")) {
+            nonVegCount++;
+          } else if (val) {
+            vegCount++;
+          }
+        }
+        if (lowerKey.includes("shirt") || lowerKey.includes("tshirt") || lowerKey.includes("टी-शर्ट") || lowerKey.includes("size") || lowerKey.includes("साइज")) {
+          if (val) {
+            tshirtSizes[val] = (tshirtSizes[val] || 0) + 1;
+          }
+        }
+      }
 
       const amt = Number(item["Amount"]) || Number(selectedEvent?.baseAmount) || 0;
       const status = String(item["Payment_Status"] || item["paymentStatus"] || "").toLowerCase();
@@ -150,10 +216,14 @@ export default function ManageRegistrations() {
       }
     });
 
+    const tshirtArray = Object.entries(tshirtSizes).map(([size, count]) => ({ size, count }));
+
     return {
       total: list.length,
+      hasFoodField,
       vegCount,
       nonVegCount,
+      tshirtArray,
       paidCount,
       paidAmount,
       pendingCount,
@@ -176,7 +246,6 @@ export default function ManageRegistrations() {
 
     let msg = selectedEvent?.whatsappTemplate || "नमस्कार {name}, {event} नोंदणीसाठी धन्यवाद. Reg ID: {regId}, फी: ₹{amount}, स्थिती: {status}.";
     
-    // प्लेसहोल्डर बदलणे (यात {regId} जोडले आहे)
     msg = msg
       .replace(/{name}/g, fullName)
       .replace(/{event}/g, selectedEvent?.title || "")
@@ -184,11 +253,10 @@ export default function ManageRegistrations() {
       .replace(/{amount}/g, String(amt))
       .replace(/{status}/g, status);
 
-    // encodeURIComponent आपोआप एंटर (Next line) चे रूपांतर व्हॉट्सॲप लिंक फॉरमॅटमध्ये करतो
     return `https://wa.me/${mobile}?text=${encodeURIComponent(msg)}`;
   };
 
-  // 6. Payment Action Handler (Trigger Modal or Toggle to Pending)
+  // 6. Payment Action Handler
   const handlePaymentClick = async (row, index) => {
     if (!perms.canEditPayment) {
       showError("अस्वीकृत", "पेमेंट स्थिती बदलण्याची परवानगी फक्त Desk किंवा Finance Admin ला आहे.");
@@ -200,20 +268,17 @@ export default function ManageRegistrations() {
     const isCurrentlyPaid = currentStatus === "paid" || currentStatus === "यशस्वी";
     const currentAmt = Number(row["Amount"]) || Number(selectedEvent?.baseAmount) || 0;
 
-    // जर आधीच Paid असेल तर Pending करण्यासाठी विचारणे
     if (isCurrentlyPaid) {
       const confirmPending = await showConfirm(
         "पेमेंट बाकी करायचे?",
         `${regId} चे पेमेंट पुन्हा 'Pending' म्हणून चिन्हांकित करायचे आहे का?`
       );
       if (confirmPending) {
-        // थेट 'Pending' म्हणून executeUpdate पाठवणे
         await executePaymentUpdate(regId, "Pending", "-", index, currentAmt);
       }
       return;
     }
 
-    // Modal उघडताना रक्कम संख्या स्वरूपात स्टेटमध्ये सेट करणे
     setPaymentModalData({
       regId,
       fullName: row["Full_Name"] || row["fullName"] || "सदस्य",
@@ -222,11 +287,9 @@ export default function ManageRegistrations() {
     });
   };
 
-  // Actual Payment Update Function (With Auto-Refresh Sync)
   const executePaymentUpdate = async (regId, newStatus, paymentMode, index, finalAmount) => {
     const updatedAmount = Number(finalAmount) || 0;
 
-    // १. लोकल स्टेट तात्काळ अपडेट (Instant UI)
     const updated = [...list];
     if (updated[index]) {
       updated[index]["Payment_Status"] = newStatus;
@@ -238,7 +301,6 @@ export default function ManageRegistrations() {
     setUpdatingId(regId);
     setPaymentModalData(null);
 
-    // २. Google Sheet Sync
     try {
       const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
       if (scriptUrl) {
@@ -250,14 +312,13 @@ export default function ManageRegistrations() {
             action: "updatePayment",
             Event_Title: selectedEvent.title,
             regId: String(regId).trim(),
-            newStatus: newStatus, // "Paid" किंवा "Pending"
+            newStatus: newStatus,
             paymentMode: paymentMode,
             amount: updatedAmount,
             updatedBy: currentUser?.name || currentUser?.email || "Desk Admin"
           }),
         });
 
-        // ३. Google Sheet ला राइट होण्यासाठी १ सेकंदाचा अवकाश देऊन Auto-Refresh
         setTimeout(() => {
           fetchSheetData(false);
         }, 1200);
@@ -272,12 +333,11 @@ export default function ManageRegistrations() {
     }
   };
 
-  // Food Status Toggle (Served / Pending) (With Auto-Refresh Sync)
+  // Food Status Toggle
   const handleToggleFood = async (regId, currentFoodStatus, index) => {
     const isCurrentlyServed = String(currentFoodStatus || "").toLowerCase() === "served";
     const newStatus = isCurrentlyServed ? "Pending" : "Served";
 
-    // १. लोकल स्टेट तात्काळ अपडेट
     const updated = [...list];
     if (updated[index]) {
       updated[index]["Food_Status"] = newStatus;
@@ -285,7 +345,6 @@ export default function ManageRegistrations() {
     }
     setUpdatingFoodId(regId);
 
-    // २. Google Sheet Sync
     try {
       const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
       if (scriptUrl) {
@@ -302,7 +361,6 @@ export default function ManageRegistrations() {
           }),
         });
 
-        // ३. Google Sheet वरून डेटा आपोआप परत मिळवणे (Auto-Refresh)
         setTimeout(() => {
           fetchSheetData(false);
         }, 1200);
@@ -317,7 +375,7 @@ export default function ManageRegistrations() {
     }
   };
 
-  // 7. Superadmin Edit Registration Handler
+  // 7. Superadmin Dynamic Edit Registration Handler
   const handleOpenEditModal = (row, index) => {
     if (!isSuperAdmin) {
       showError("परवानगी नाही", "नोंदणीतील माहिती बदलण्याचे अधिकार फक्त Superadmin ला आहेत.");
@@ -325,63 +383,25 @@ export default function ManageRegistrations() {
     }
 
     const regId = row["Reg_ID"] || row["regId"] || "-";
-    const fullName = row["Full_Name"] || row["fullName"] || row["पूर्ण नाव (Full Name)"] || "";
-    const mobile = row["Mobile"] || row["mobile"] || row["व्हॉट्सॲप नंबर (WhatsApp No)"] || "";
-    const currentFood = getFoodType(row) || "Veg";
 
     setEditModalData({
       index,
       regId,
-      fullName,
-      mobile,
-      food: currentFood
+      fields: { ...row }
     });
   };
 
-  // Save Edit Details (Local + Live Google Sheet Sync + Auto Refresh)
   const handleSaveEditMember = async (e) => {
     e.preventDefault();
-    if (!editModalData) return;
-
-    if (!editModalData.fullName.trim()) {
-      showError("अपूर्ण माहिती", "कृपया पूर्ण नाव प्रविष्ट करा.");
-      return;
-    }
+    if (!editModalData || !selectedEvent) return;
 
     setSavingEdit(true);
-    const { index, regId, fullName, mobile, food } = editModalData;
+    const { index, regId, fields } = editModalData;
 
-    // १. लोकल स्टेट अपडेट
     const updated = [...list];
-    const targetRow = { ...updated[index] };
-
-    if ("Full_Name" in targetRow) targetRow["Full_Name"] = fullName;
-    else if ("fullName" in targetRow) targetRow["fullName"] = fullName;
-    else if ("पूर्ण नाव (Full Name)" in targetRow) targetRow["पूर्ण नाव (Full Name)"] = fullName;
-    else targetRow["Full_Name"] = fullName;
-
-    if ("Mobile" in targetRow) targetRow["Mobile"] = mobile;
-    else if ("mobile" in targetRow) targetRow["mobile"] = mobile;
-    else if ("व्हॉट्सॲप नंबर (WhatsApp No)" in targetRow) targetRow["व्हॉट्सॲप नंबर (WhatsApp No)"] = mobile;
-    else targetRow["Mobile"] = mobile;
-
-    let foodUpdated = false;
-    for (let key in targetRow) {
-      const lower = key.toLowerCase();
-      if (lower.includes("food") || lower.includes("जेवण") || lower.includes("meal")) {
-        targetRow[key] = food;
-        foodUpdated = true;
-        break;
-      }
-    }
-    if (!foodUpdated) {
-      targetRow["Food"] = food;
-    }
-
-    updated[index] = targetRow;
+    updated[index] = { ...updated[index], ...fields };
     setList(updated);
 
-    // २. Google Sheet Sync
     try {
       const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
       if (scriptUrl) {
@@ -393,19 +413,16 @@ export default function ManageRegistrations() {
             action: "editRegistration",
             Event_Title: selectedEvent.title,
             regId: String(regId).trim(),
-            fullName: fullName,
-            mobile: mobile,
-            food: food,
+            ...fields,
             updatedBy: currentUser?.name || currentUser?.email || "Superadmin"
           }),
         });
 
-        // ३. Auto-Refresh
         setTimeout(() => {
           fetchSheetData(false);
         }, 1200);
       }
-      showSuccess("बदल जतन झाले!", `${regId} ची माहिती (नाव/मोबाईल/जेवण) यशस्वीरित्या अपडेट झाली.`);
+      showSuccess("बदल जतन झाले!", `Reg ID: ${regId} ची सर्व माहिती यशस्वीरित्या अपडेट झाली.`);
       setEditModalData(null);
     } catch (err) {
       console.error(err);
@@ -584,57 +601,81 @@ export default function ManageRegistrations() {
         </div>
       )}
 
-      {/* Summary Stats Cards */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+      {/* Dynamic Summary Stats Cards (मोबाईलसाठी कॉम्पॅक्ट आणि रिस्पॉन्सिव्ह) */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+        
+        {/* Card 1: एकूण अर्ज */}
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">एकूण अर्ज</span>
-            <Users className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-orange-500" />
+            <Users className="w-4 h-4 text-orange-500" />
           </div>
           <div className="mt-1 sm:mt-2">
-            <div className="text-lg sm:text-3xl lg:text-4xl font-black text-slate-900 leading-none">
+            <div className="text-xl sm:text-3xl font-black text-slate-900 leading-none">
               {stats.total}
             </div>
             <div className="text-[10px] sm:text-xs font-semibold text-slate-400 mt-1">नोंदणीकृत</div>
           </div>
         </div>
 
-        <div className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">जेवण पर्याय</span>
-            <Salad className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-600" />
-          </div>
-          <div className="mt-1 sm:mt-2 flex items-baseline gap-2 sm:gap-4">
-            <div>
-              <span className="text-sm sm:text-2xl lg:text-3xl font-black text-emerald-600 leading-none">{stats.vegCount}</span>
-              <span className="text-[9px] sm:text-xs font-bold text-slate-500 ml-1">व्हेज</span>
+        {/* Card 2: जेवण पर्याय (फक्त जेवण फील्ड असल्यास दिसेल) */}
+        {stats.hasFoodField && (
+          <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">जेवण पर्याय</span>
+              <Salad className="w-4 h-4 text-emerald-600" />
             </div>
-            <div className="border-l border-slate-200 pl-2 sm:pl-4">
-              <span className="text-sm sm:text-2xl lg:text-3xl font-black text-rose-600 leading-none">{stats.nonVegCount}</span>
-              <span className="text-[9px] sm:text-xs font-bold text-slate-500 ml-1">नॉनव्हेज</span>
+            <div className="mt-1 sm:mt-2 flex items-baseline gap-2 sm:gap-4">
+              <div>
+                <span className="text-sm sm:text-2xl font-black text-emerald-600 leading-none">{stats.vegCount}</span>
+                <span className="text-[9px] sm:text-xs font-bold text-slate-500 ml-1">व्हेज</span>
+              </div>
+              <div className="border-l border-slate-200 pl-2 sm:pl-4">
+                <span className="text-sm sm:text-2xl font-black text-rose-600 leading-none">{stats.nonVegCount}</span>
+                <span className="text-[9px] sm:text-xs font-bold text-slate-500 ml-1">नॉनव्हेज</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Card 3: टी-शर्ट वितरण (फक्त टी-शर्ट/साईज फील्ड असल्यास दिसेल) */}
+        {stats.tshirtArray.length > 0 && (
+          <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">टी-शर्ट साईज</span>
+              <Shirt className="w-4 h-4 text-blue-600" />
+            </div>
+            <div className="mt-1 sm:mt-2 flex items-center gap-1.5 flex-wrap">
+              {stats.tshirtArray.map((t, i) => (
+                <div key={i} className="px-2 py-0.5 bg-blue-50 border border-blue-200 rounded-lg text-[10px] sm:text-xs font-bold text-blue-800">
+                  {t.size}: <span className="font-black text-blue-900">{t.count}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Card Last: जमा / बाकी */}
+        <div className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">जमा / बाकी</span>
+            <IndianRupee className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="mt-1 sm:mt-2 flex items-baseline justify-between">
+            <div>
+              <div className="text-sm sm:text-xl font-black text-emerald-700 leading-none">
+                ₹{stats.paidAmount} <span className="text-[9px] font-bold text-emerald-600">({stats.paidCount})</span>
+              </div>
+              <div className="text-[9px] text-slate-400 font-semibold mt-0.5">
+                UPI: {stats.upiCount} • Cash: {stats.cashCount}
+              </div>
+            </div>
+            <div className="text-xs sm:text-base font-black text-amber-700 text-right">
+              ₹{stats.pendingAmount} <span className="text-[9px] font-bold text-amber-600">({stats.pendingCount})</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-white p-3 sm:p-5 rounded-2xl border border-slate-200 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] sm:text-xs font-bold text-slate-400 uppercase tracking-wider">जमा / बाकी</span>
-            <IndianRupee className="w-3.5 h-3.5 sm:w-5 sm:h-5 text-emerald-600" />
-          </div>
-          <div className="mt-1 sm:mt-2 flex flex-col sm:flex-row sm:items-baseline sm:gap-3">
-            <div>
-              <div className="text-sm sm:text-2xl lg:text-3xl font-black text-emerald-700 leading-none">
-                ₹{stats.paidAmount} <span className="text-[10px] sm:text-xs font-bold text-emerald-600 font-sans">({stats.paidCount})</span>
-              </div>
-              <div className="text-[9px] sm:text-[10px] text-slate-400 font-semibold mt-0.5">
-                UPI: {stats.upiCount} • Cash: {stats.cashCount}
-              </div>
-            </div>
-            <div className="text-xs sm:text-lg lg:text-xl font-black text-amber-700 leading-none mt-1 sm:mt-0 sm:border-l sm:border-slate-200 sm:pl-3">
-              ₹{stats.pendingAmount} <span className="text-[10px] sm:text-xs font-bold text-amber-600 font-sans">({stats.pendingCount})</span>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -706,17 +747,17 @@ export default function ManageRegistrations() {
             const status = String(row["Payment_Status"] || row["paymentStatus"] || "").toLowerCase();
             const isPaid = status === "paid" || status === "यशस्वी" || status === "free";
             const paymentMode = row["Payment_Mode"] || row["paymentMode"] || "";
-            const foodType = getFoodType(row);
+            const dynamicBadges = getDynamicBadges(row);
             const waLink = getWhatsAppLink(row);
             const isUpdating = updatingId === regId;
 
             return (
               <div
                 key={index}
-                className="bg-white p-2.5 sm:p-3.5 rounded-2xl border border-slate-200/90 shadow-xs hover:border-orange-200 transition"
+                className="bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/90 shadow-xs hover:border-orange-200 transition space-y-2.5"
               >
                 {/* 1st Row: Name & Reg ID */}
-                <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="flex items-center justify-between gap-2">
                   <h3 className="text-xs sm:text-base font-black text-slate-900 truncate">
                     {fullName}
                   </h3>
@@ -725,56 +766,43 @@ export default function ManageRegistrations() {
                   </span>
                 </div>
 
-                {/* 2nd Row: Info & Actions */}
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
-                    <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-slate-100 text-slate-600 text-[10px] sm:text-xs font-bold flex items-center justify-center shrink-0">
+                {/* 2nd Row: Sr No, User Form Inputs (Column G, T-Shirt, Batsman/Bowler etc.) & Action Buttons */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-100">
+                  
+                  {/* Left Side: Index & User Form Input Badges */}
+                  <div className="flex items-center gap-1.5 flex-wrap min-w-0">
+                    <span className="w-5 h-5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-bold flex items-center justify-center shrink-0">
                       {index + 1}
                     </span>
 
-                    {foodType && (
-                      <span className={`inline-flex items-center gap-0.5 text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded border shrink-0 ${
-                        foodType === "Veg" 
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200" 
-                          : "bg-rose-50 text-rose-700 border-rose-200"
-                      }`}>
-                        {foodType === "Veg" ? (
-                          <Salad className="w-2.5 h-2 sm:w-3 sm:h-3 text-emerald-600" />
-                        ) : (
-                          <Drumstick className="w-2.5 h-2 sm:w-3 sm:h-3 text-rose-600" />
-                        )}
-                        {foodType}
-                      </span>
-                    )}
-
-                    {mobile && (
-                      <a
-                        href={`tel:${mobile}`}
-                        className="hidden md:inline-flex items-center gap-1 text-xs font-bold text-slate-600 hover:text-slate-900 bg-slate-50 hover:bg-slate-100 px-2 py-0.5 rounded border border-slate-200 transition"
-                        title="कॉल करा"
-                      >
-                        <Phone className="w-3 h-3 text-slate-400" />
-                        {mobile}
-                      </a>
-                    )}
+                    {/* युझरने फॉर्ममध्ये भरलेले सर्व डेटा बॅजेस (Column G सह सर्व कस्टम फील्ड्स) */}
+                    {dynamicBadges.map((b, bIdx) => {
+                      const IconTag = b.Icon;
+                      return (
+                        <span key={bIdx} className={`inline-flex items-center gap-1 text-[9px] sm:text-[10px] font-bold px-2 py-0.5 rounded-md border shrink-0 ${b.color}`}>
+                          {IconTag && <IconTag className="w-2.5 h-2.5" />}
+                          <span>{b.label}</span>
+                        </span>
+                      );
+                    })}
                   </div>
 
-                  {/* Actions Buttons */}
-                  <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+                  {/* Right Side: Action Buttons */}
+                  <div className="flex items-center gap-1.5 flex-wrap justify-end shrink-0">
                     
-                    {/* Superadmin Edit Button (Pencil Icon) */}
+                    {/* Superadmin Edit Button */}
                     {isSuperAdmin && (
                       <button
                         onClick={() => handleOpenEditModal(row, index)}
                         className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-orange-50 hover:bg-orange-100 text-orange-600 border border-orange-200 flex items-center justify-center transition cursor-pointer active:scale-95"
-                        title="माहिती संपादित करा (फक्त Superadmin)"
+                        title="माहिती संपादित करा"
                       >
                         <Pencil className="w-3.5 h-3.5" />
                       </button>
                     )}
 
                     {/* Food Served Toggle Button */}
-                    {foodType && (
+                    {stats.hasFoodField && (
                       <button
                         disabled={updatingFoodId === regId}
                         onClick={() => handleToggleFood(regId, row["Food_Status"], index)}
@@ -836,7 +864,7 @@ export default function ManageRegistrations() {
                           ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100 cursor-pointer"
                           : "bg-amber-50 text-amber-700 border-amber-300 hover:bg-amber-100 cursor-pointer"
                       }`}
-                      title={!perms.canEditPayment ? "फक्त Desk/Finance Admin ला परवानगी आहे" : "पेमेंट स्थिती बदला"}
+                      title="पेमेंट स्थिती बदला"
                     >
                       {isUpdating ? (
                         <RefreshCw className="w-3 h-3 animate-spin text-slate-600" />
@@ -858,6 +886,7 @@ export default function ManageRegistrations() {
                       )}
                     </button>
                   </div>
+
                 </div>
               </div>
             );
@@ -865,7 +894,7 @@ export default function ManageRegistrations() {
         )}
       </div>
 
-      {/* Payment Mode Selector Modal (Editable Amount Support) */}
+      {/* Payment Mode Selector Modal */}
       {paymentModalData && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
@@ -887,7 +916,6 @@ export default function ManageRegistrations() {
               </button>
             </div>
 
-            {/* Editable Amount Input Box */}
             <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200">
               <label className="text-[11px] font-bold text-slate-600 block mb-1">
                 जमा झालेली एकूण रक्कम (₹)
@@ -905,14 +933,9 @@ export default function ManageRegistrations() {
                   placeholder="0"
                 />
               </div>
-              <p className="text-[10px] text-slate-400 font-medium mt-1">
-                * सदस्याने स्वेच्छेने जास्त वर्गणी/देणगी दिली असल्यास रक्कम बदलून नोंदवा.
-              </p>
             </div>
 
-            {/* Payment Mode Selection Buttons */}
             <div className="grid grid-cols-2 gap-2.5 pt-1">
-              {/* Option 1: UPI */}
               <button
                 type="button"
                 onClick={() => executePaymentUpdate(paymentModalData.regId, "Paid", "UPI", paymentModalData.index, paymentModalData.amount)}
@@ -927,7 +950,6 @@ export default function ManageRegistrations() {
                 </span>
               </button>
 
-              {/* Option 2: Cash */}
               <button
                 type="button"
                 onClick={() => executePaymentUpdate(paymentModalData.regId, "Paid", "Cash", paymentModalData.index, paymentModalData.amount)}
@@ -957,16 +979,16 @@ export default function ManageRegistrations() {
         </div>
       )}
 
-      {/* Superadmin Edit Registration Modal */}
+      {/* Superadmin Fully Dynamic Edit Registration Modal */}
       {editModalData && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
-          <div className="bg-white rounded-3xl max-w-sm w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] flex flex-col">
             
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
+            <div className="flex items-center justify-between pb-2 border-b border-slate-100 shrink-0">
               <div>
                 <h3 className="text-sm font-black text-slate-900 flex items-center gap-1.5">
                   <Pencil className="w-4 h-4 text-orange-600" />
-                  नोंदणी माहिती संपादित करा
+                  सर्व माहिती संपादित करा (Dynamic Edit)
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
                   Reg ID: <span className="font-mono text-orange-600 font-bold">{editModalData.regId}</span>
@@ -980,72 +1002,39 @@ export default function ManageRegistrations() {
               </button>
             </div>
 
-            <form onSubmit={handleSaveEditMember} className="space-y-3.5 text-xs">
+            {/* Dynamic Fields Form Scrollable Area */}
+            <form onSubmit={handleSaveEditMember} className="space-y-3 overflow-y-auto pr-1 flex-1 text-xs">
               
-              {/* Full Name */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  पूर्ण नाव (Full Name) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={editModalData.fullName}
-                  onChange={(e) => setEditModalData({ ...editModalData, fullName: e.target.value })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-900 outline-none focus:bg-white focus:border-orange-500"
-                />
-              </div>
+              {Object.keys(editModalData.fields).map((key) => {
+                const isReadOnly = ["Reg_ID", "Timestamp"].includes(key);
 
-              {/* Mobile Number */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  व्हॉट्सॲप नंबर (Mobile No)
-                </label>
-                <input
-                  type="tel"
-                  maxLength="10"
-                  value={editModalData.mobile}
-                  onChange={(e) => setEditModalData({ ...editModalData, mobile: e.target.value.replace(/\D/g, "") })}
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold font-mono text-slate-900 outline-none focus:bg-white focus:border-orange-500"
-                />
-              </div>
+                return (
+                  <div key={key} className="space-y-1">
+                    <label className="font-bold text-slate-700 block text-[11px] uppercase tracking-wider">
+                      {key} {isReadOnly && <span className="text-slate-400 font-normal">(Read-only)</span>}
+                    </label>
+                    <input
+                      type="text"
+                      disabled={isReadOnly}
+                      value={editModalData.fields[key] !== undefined ? editModalData.fields[key] : ""}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditModalData(prev => ({
+                          ...prev,
+                          fields: {
+                            ...prev.fields,
+                            [key]: val
+                          }
+                        }));
+                      }}
+                      className={`w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2.5 font-bold text-slate-900 outline-none focus:bg-white focus:border-orange-500 ${isReadOnly ? 'opacity-60 cursor-not-allowed bg-slate-100' : ''}`}
+                    />
+                  </div>
+                );
+              })}
 
-              {/* Food Option Selector (Veg vs Non-Veg) */}
-              <div>
-                <label className="font-bold text-slate-700 block mb-1">
-                  जेवण पर्याय (Meal Choice)
-                </label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setEditModalData({ ...editModalData, food: "Veg" })}
-                    className={`py-2.5 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
-                      editModalData.food === "Veg"
-                        ? "bg-emerald-50 text-emerald-700 border-emerald-500 shadow-xs"
-                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Salad className="w-4 h-4 text-emerald-600" />
-                    <span>शाकाहारी (Veg)</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setEditModalData({ ...editModalData, food: "Non-Veg" })}
-                    className={`py-2.5 px-3 rounded-xl font-bold flex items-center justify-center gap-1.5 border transition cursor-pointer ${
-                      editModalData.food === "Non-Veg"
-                        ? "bg-rose-50 text-rose-700 border-rose-500 shadow-xs"
-                        : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                    }`}
-                  >
-                    <Drumstick className="w-4 h-4 text-rose-600" />
-                    <span>मांसाहारी (Non-Veg)</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100">
+              {/* Action Buttons inside Form */}
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 sticky bottom-0 bg-white py-2">
                 <button
                   type="button"
                   onClick={() => setEditModalData(null)}

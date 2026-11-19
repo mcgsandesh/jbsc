@@ -95,7 +95,7 @@ export default function Boxt20Splash() {
           {/* Blinking Badge */}
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-600 text-white font-black text-xs sm:text-sm tracking-wider uppercase border border-rose-400 shadow-lg shadow-rose-600/40 animate-pulse">
             <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-            🔥 COMING SOON • DEC 2026 🔥
+            🔥 06 DEC 2026 🔥
           </div>
 
           {/* Solid Glowing BOXT20 Title (कधीही गायब होणार नाही) */}
@@ -158,7 +158,7 @@ export default function Boxt20Splash() {
           onClick={() => setIsOpen(false)}
           className="w-full mt-2 py-3 rounded-2xl bg-orange-600 hover:bg-orange-500 text-white font-black text-sm shadow-lg shadow-orange-600/40 flex items-center justify-center gap-2 transition active:scale-95 cursor-pointer"
         >
-          <span>दीपोत्सव नोंदणी फॉर्म भरा</span>
+          <span>नोंदणी फॉर्म भरा</span>
           <ChevronRight className="w-4 h-4" />
         </button>
 

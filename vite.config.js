@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       devOptions: {
         enabled: true // <-- Localhost dev mode madhye Service Worker aani PWA suru karnyasaathi
       },
@@ -39,9 +39,16 @@ export default defineConfig({
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable'
-          }
+          }        
+
         ]
-      }
+      },
+          workbox: {
+        // क्लिअर कॅश आणि सतत रिफ्रेश रोखण्यासाठी
+        cleanupOutdatedCaches: true,
+        skipWaiting: false,
+        clientsClaim: false,
+      } 
     })
   ],
   base: '/jbsc/',

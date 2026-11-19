@@ -13,40 +13,45 @@ import {
   CreditCard,
   Copy,
   ExternalLink,
-  X
+  X,
+  Calendar
 } from "lucide-react";
 import { getAllEvents } from "../../services/eventService";
 import { showSuccess } from "../../utils/alert";
 import Boxt20Splash from "../../components/common/Boxt20Splash";
 import LiveDrawBanner from "../../components/common/LiveDrawBanner";
+import NotificationButton from "../../components/common/NotificationButton";
+
 
 export default function Home() {
   const base = import.meta.env.BASE_URL;
 
+  const [eventsList, setEventsList] = useState([]);
   const [liveEvent, setLiveEvent] = useState(null);
   const [isUpiModalOpen, setIsUpiModalOpen] = useState(false);
 
-  // 1. Fetch Live Event (Strictly isActive === true only)
+  // 1. Fetch All Events & Identify Live/Active Event
   useEffect(() => {
-    const fetchLiveEvent = async () => {
+    const fetchEvents = async () => {
       try {
         const events = await getAllEvents();
         if (events && events.length > 0) {
-          // Fakt aani fakt isActive: true asel tarach ghyaycha, kontehi fallback 'events[0]' nako
-          const active = events.find(e => e.isActive === true);
+          setEventsList(events);
+          const active = events.find(e => e.isActive === true || e.isActive === "true" || e.isActive === 1);
           setLiveEvent(active || null);
         } else {
+          setEventsList([]);
           setLiveEvent(null);
         }
       } catch (err) {
-        console.error("Live event load error:", err);
+        console.error("Events load error:", err);
+        setEventsList([]);
         setLiveEvent(null);
       }
     };
-    fetchLiveEvent();
+    fetchEvents();
   }, []);
 
-  // Firestore exact path: upiSettings.upiId aani upiSettings.payeeName
   const upiId = 
     liveEvent?.upiSettings?.upiId || 
     liveEvent?.upiId || 
@@ -60,12 +65,10 @@ export default function Home() {
 
   const amount = Number(liveEvent?.baseAmount) || 200;
 
-  // Realtime UPI Link
   const upiDeepLink = upiId 
     ? `upi://pay?pa=${encodeURIComponent(upiId)}&pn=${encodeURIComponent(payeeName)}&am=${amount}&cu=INR&tn=${encodeURIComponent((liveEvent?.title || "Event") + " Fee")}`
     : "";
 
-  // Dynamic Realtime QR Code
   const qrCodeUrl = upiDeepLink
     ? `https://api.qrserver.com/v1/create-qr-code/?size=250x250&margin=8&data=${encodeURIComponent(upiDeepLink)}`
     : "";
@@ -121,7 +124,18 @@ export default function Home() {
     }
   ];
 
-  const otherEvents = [
+  // दीपोत्सव कार्ड पुन्हा समाविष्ट केले आहे
+  const staticFestivals = [
+    {
+      id: "dipostav",
+      title: "दीपोत्सव २०२६",
+      tagline: "एकत्रित प्रकाश, एकत्रित आनंद",
+      desc: "हजारो दिव्यांची रोषणाई, विविध स्पर्धा, महिलांसाठी विशेष खेळ व स्नेहभोजन सोहळा.",
+      badge: "वार्षिक उत्सव",
+      icon: HeartHandshake,
+      badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      actionLink: "/dipostav"
+    },
     {
       id: "shivjayanti",
       title: "शिवजयंती जन्मोत्सव सोहळा",
@@ -139,17 +153,6 @@ export default function Home() {
       badge: "आनंदोत्सव",
       icon: Sparkles,
       badgeColor: "bg-pink-50 text-pink-700 border-pink-200"
-    },
-    {
-      id: "dipostav",
-      title: liveEvent?.title || "दीपोत्सव २०२६",
-      tagline: "एकत्रित प्रकाश, एकत्रित आनंद",
-      desc: "हजारो दिव्यांची रोषणाई, विविध स्पर्धा, महिलांसाठी विशेष खेळ व स्नेहभोजन सोहळा.",
-      badge: liveEvent?.isActive !== false ? "नोंदणी सुरू आहे" : "नोंदणी बंद",
-      icon: HeartHandshake,
-      badgeColor: "bg-emerald-50 text-emerald-700 border-emerald-200 animate-pulse",
-      featured: true,
-      actionLink: liveEvent?.slug ? `/${liveEvent.slug}` : "/register"
     }
   ];
 
@@ -179,15 +182,16 @@ export default function Home() {
               </p>
 
               <div className="mt-6 flex flex-wrap items-center justify-center lg:justify-start gap-3">
-                <Link
-                  to={liveEvent?.slug ? `/${liveEvent.slug}` : "/register"}
-                  className="px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-orange-600/30 transition transform active:scale-95 flex items-center gap-2"
-                >
-                  <span>{liveEvent?.title || "दीपोत्सव २०२६"} सहभाग नोंदवा</span>
-                  <ArrowRight className="w-4 h-4" />
-                </Link>
+                {liveEvent && (
+                  <Link
+                    to={liveEvent.slug ? `/${liveEvent.slug}` : "/register"}
+                    className="px-6 py-3 rounded-2xl bg-orange-600 hover:bg-orange-700 text-white font-black text-xs sm:text-sm shadow-lg shadow-orange-600/30 transition transform active:scale-95 flex items-center gap-2"
+                  >
+                    <span>{liveEvent.title} सहभाग नोंदवा</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </Link>
+                )}
                 
-                {/* Navbar pramane direct /public-list pathva jyane list 100% load hote */}
                 <Link
                   to="/public-list"
                   className="px-5 py-3 rounded-2xl bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 font-bold text-xs sm:text-sm shadow-xs transition"
@@ -227,8 +231,9 @@ export default function Home() {
           </div>
         </div>
       </section>
-<LiveDrawBanner/>
-      {/* 2. Quick Dynamic UPI Payment Widget (Fakt Event Active Aslyas Disel) */}
+      <LiveDrawBanner/>
+
+      {/* 2. Quick Dynamic UPI Payment Widget */}
       {liveEvent && liveEvent.isActive && upiId && (
         <section className="max-w-5xl mx-auto px-4 sm:px-6 -mt-6 sm:-mt-8 relative z-20">
           <div className="bg-gradient-to-r from-orange-600 via-amber-600 to-orange-700 text-white p-4 sm:p-5 rounded-3xl shadow-xl flex flex-col sm:flex-row items-center justify-between gap-4 border border-orange-400/40">
@@ -292,7 +297,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 4. Events & Cricket Leagues */}
+      {/* 4. Events & Dynamic Event Cards Section */}
       <section className="max-w-5xl mx-auto px-4 sm:px-6 py-4 space-y-6">
         <div className="text-center mb-6">
           <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight">
@@ -303,6 +308,85 @@ export default function Home() {
           </p>
         </div>
 
+        {/* 1. सध्या सुरू असलेला मुख्य इव्हेंट कार्ड (फक्त isActive असल्यास दिसेल) */}
+        {liveEvent && (
+          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 rounded-3xl p-6 sm:p-8 border-2 border-orange-400 shadow-xl text-white relative overflow-hidden">
+            <div className="absolute top-0 right-0 transform translate-x-6 -translate-y-6 w-32 h-32 bg-orange-500/10 rounded-full blur-2xl pointer-events-none"></div>
+            
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
+              <div className="space-y-2.5 flex-1">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-orange-500/20 text-orange-300 text-xs font-black uppercase tracking-wider border border-orange-500/30">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                  सध्या सुरू असलेला मुख्य इव्हेंट
+                </span>
+                
+                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight">
+                  {liveEvent.title}
+                </h3>
+                
+                <p className="text-xs sm:text-sm text-slate-300 font-medium leading-relaxed">
+                  {liveEvent.description || "सहभाग नोंदवण्यासाठी आणि तपशील पाहण्यासाठी खालील बटणावर क्लिक करा."}
+                </p>
+              </div>
+
+              <Link
+                to={liveEvent.slug ? `/${liveEvent.slug}` : "/register"}
+                className="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white font-black text-xs sm:text-sm shadow-lg shadow-orange-600/30 transition transform active:scale-95 flex items-center justify-center gap-2 shrink-0 cursor-pointer border border-orange-400/30"
+              >
+                <span>नोंदणी व फॉर्म पहा</span>
+                <ArrowRight className="w-4 h-4" />
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {/* 2. इतर सक्रिय डायनॅमिक इव्हेंट कार्ड्स (फक्त isActive: true असलेलेच इथे दिसतील) */}
+        {eventsList.filter(ev => (ev.isActive === true || ev.isActive === "true" || ev.isActive === 1) && ev.id !== liveEvent?.id && ev.slug !== liveEvent?.slug).length > 0 && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {eventsList
+              .filter(ev => (ev.isActive === true || ev.isActive === "true" || ev.isActive === 1) && ev.id !== liveEvent?.id && ev.slug !== liveEvent?.slug)
+              .map((ev) => (
+                <div
+                  key={ev.id || ev.slug}
+                  className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-sm hover:border-orange-200 transition flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <span className="text-[10px] sm:text-xs font-black px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        नोंदणी सुरू आहे
+                      </span>
+                      <div className="p-2 rounded-xl bg-slate-50 text-slate-700 border border-slate-100">
+                        <Calendar className="w-4 h-4 text-orange-600" />
+                      </div>
+                    </div>
+
+                    <h3 className="text-base sm:text-lg font-black text-slate-900 leading-snug">
+                      {ev.title}
+                    </h3>
+                    
+                    <p className="text-xs text-slate-500 font-medium mt-2 leading-relaxed line-clamp-2">
+                      {ev.description || "तपशील आणि नोंदणी माहिती लवकरच जाहीर केली जाईल."}
+                    </p>
+                  </div>
+
+                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                      <CheckCircle2 className="w-3.5 h-3.5 text-orange-600" />
+                      सक्रिय फॉर्म
+                    </span>
+                    <Link
+                      to={`/${ev.slug}`}
+                      className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                    >
+                      फॉर्म पहा
+                    </Link>
+                  </div>
+                </div>
+              ))}
+          </div>
+        )}
+
+        {/* 3. JBSC बॉक्स क्रिकेट लीग (६ संघ) */}
         <div className="bg-white rounded-3xl p-5 sm:p-8 border border-orange-200/90 shadow-md">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 mb-6">
             <div>
@@ -354,17 +438,14 @@ export default function Home() {
           </div>
         </div>
 
+        {/* 4. इतर पारंपरिक सांस्कृतिक उत्सव (दीपोत्सवासह) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {otherEvents.map((ev) => {
+          {staticFestivals.map((ev) => {
             const Icon = ev.icon;
             return (
               <div
                 key={ev.id}
-                className={`bg-white rounded-3xl p-5 sm:p-6 border transition flex flex-col justify-between ${
-                  ev.featured 
-                    ? "border-orange-300 shadow-md ring-2 ring-orange-500/10" 
-                    : "border-slate-200/90 shadow-xs hover:border-slate-300"
-                }`}
+                className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200/90 shadow-xs hover:border-slate-300 transition flex flex-col justify-between"
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-3">
@@ -387,20 +468,18 @@ export default function Home() {
                   </p>
                 </div>
 
-                {ev.featured && (
-                  <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-emerald-700 flex items-center gap-1">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      नोंदणी चालू आहे
-                    </span>
-                    <Link
-                      to={ev.actionLink}
-                      className="px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white font-bold text-xs shadow-xs transition cursor-pointer"
-                    >
-                      आता नोंदणी करा
-                    </Link>
-                  </div>
-                )}
+                <div className="mt-5 pt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-slate-600 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-orange-600" />
+                    संस्कृती व सण
+                  </span>
+                  <Link
+                    to={ev.actionLink}
+                    className="px-4 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs shadow-xs transition cursor-pointer"
+                  >
+                    तपशील पहा
+                  </Link>
+                </div>
               </div>
             );
           })}
@@ -418,7 +497,7 @@ export default function Home() {
                   फी भरा (UPI Payment)
                 </h3>
                 <p className="text-[11px] text-slate-500 font-medium mt-0.5">
-                  {liveEvent?.title || "दीपोत्सव २०२६"}
+                  {liveEvent?.title || "JBSC Events"}
                 </p>
               </div>
               <button 
@@ -434,7 +513,6 @@ export default function Home() {
                 कोणत्याही UPI ॲपने स्कॅन करा
               </span>
 
-              {/* Realtime QR Code */}
               {qrCodeUrl ? (
                 <img 
                   src={qrCodeUrl} 
@@ -452,7 +530,6 @@ export default function Home() {
                 ₹{amount}
               </div>
 
-              {/* Firestore data: upiSettings.upiId */}
               {upiId && (
                 <div className="flex items-center justify-between bg-white px-3 py-1.5 rounded-xl border border-slate-200 text-xs">
                   <span className="font-mono text-slate-700 font-bold truncate">
@@ -500,5 +577,4 @@ export default function Home() {
     </div>
     </>
   );
-
 }

@@ -1,17 +1,73 @@
 // src/utils/financePrintHelper.js
+import { getAllEvents } from "../services/eventService";
 
-export const printFinanceStatement = ({
+export const printFinanceStatement = async ({
   clubName = "जागेवाला बाबा स्पोर्ट्स क्लब",
   eventTitle = "दीपोत्सव २०२६",
-  year = "२०२६",
-  transactions = []
+  year = "२०२०",
+  transactions = [],
+  selectedEventId = "ALL"
 }) => {
   if (!transactions || transactions.length === 0) {
     alert("प्रिंट करण्यासाठी कोणतीही नोंद उपलब्ध नाही.");
     return;
   }
 
-  const incomes = transactions.filter((t) => t.type === "income");
+  let sheetMembers = [];
+  let baseFee = 0;
+
+  // जर एखादा विशिष्ट इव्हेंट निवडलेला असेल, तर Google Sheet मधून मेंबर यादी आणावी
+  if (selectedEventId && selectedEventId !== "ALL") {
+    try {
+      const allEvents = await getAllEvents();
+      const matchedEv = allEvents.find(e => e.id === selectedEventId || e.slug === selectedEventId);
+      if (matchedEv) {
+        baseFee = Number(matchedEv.baseAmount) || 0;
+        const scriptUrl = import.meta.env.VITE_GOOGLE_SHEET_API_URL;
+        if (scriptUrl) {
+          const res = await fetch(`${scriptUrl}?sheet=${encodeURIComponent(matchedEv.title)}`);
+          const result = await res.json();
+          if (result && result.status === "success") {
+            sheetMembers = result.data || [];
+          }
+        }
+      }
+    } catch (e) {
+      console.warn("Could not fetch Google Sheet members for Annexure:", e);
+    }
+  }
+
+  // शीटमधील सदस्यांचे सॉर्टिंग (तुमच्या नियमानुसार: Max First -> A-Z -> Pending at End Highlighted)
+  const processedMembers = sheetMembers.map((m) => {
+    const amt = Number(m["Amount"] || m["amount"] || baseFee) || 0;
+    const name = String(m["Full_Name"] || m["fullName"] || m["पूर्ण नाव (Full Name)"] || m["नाव"] || "सदस्य").trim();
+    const regId = String(m["Reg_ID"] || m["regId"] || "-");
+    const mobile = String(m["Mobile"] || m["mobile"] || m["व्हॉट्सॲप नंबर (WhatsApp No)"] || "-");
+    const status = String(m["Payment_Status"] || m["paymentStatus"] || "").toLowerCase();
+    const isPaid = status === "paid" || status === "यशस्वी" || status === "free";
+
+    return { name, regId, mobile, amount: amt, isPaid, status };
+  });
+
+  // ३-टप्प्यांचे सॉर्टिंग लॉजिक
+  processedMembers.sort((a, b) => {
+    // जर एकाचे पेमेंट Pending असेल आणि दुसऱ्याचे Paid/Free, तर Pending नेहमी खाली जाईल
+    if (a.isPaid !== b.isPaid) {
+      return a.isPaid ? -1 : 1; // Paid वर, Pending खाली
+    }
+
+    // जर दोघेही Paid असतील, तर Extra Contributors (Amount > baseFee) सर्वात वर (Max First)
+    if (a.isPaid && b.isPaid) {
+      if (a.amount !== b.amount) {
+        return b.amount - a.amount; // उतरता क्रम (जास्त रक्कम आधी)
+      }
+    }
+
+    // रक्कम सारखी असेल किंवा दोघेही Pending असतील, तर नावाप्रमाणे A to Z क्रम
+    return a.name.localeCompare(b.name, "mr");
+  });
+
+  const incomes = [...transactions.filter((t) => t.type === "income")];
   const expenses = transactions.filter((t) => t.type === "expense");
 
   const totalIncome = incomes.reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
@@ -29,7 +85,6 @@ export const printFinanceStatement = ({
 
     tableRowsHtml += `
       <tr>
-        <!-- Income Side -->
         <td style="text-align: center; color: #64748b; width: 18px;">${inc ? i + 1 : ""}</td>
         <td style="font-weight: 600; font-size: 8.5px;">${inc ? inc.category || "-" : ""}</td>
         <td style="color: #475569; font-size: 8px;">${inc ? inc.description || "-" : ""}</td>
@@ -37,7 +92,6 @@ export const printFinanceStatement = ({
           ${inc ? "₹" + Number(inc.amount).toLocaleString("en-IN") : ""}
         </td>
 
-        <!-- Expense Side -->
         <td style="text-align: center; color: #64748b; width: 18px;">${exp ? i + 1 : ""}</td>
         <td style="font-weight: 600; font-size: 8.5px;">${exp ? exp.category || "-" : ""}</td>
         <td style="color: #475569; font-size: 8px;">${exp ? exp.description || "-" : ""}</td>
@@ -45,6 +99,60 @@ export const printFinanceStatement = ({
           ${exp ? "₹" + Number(exp.amount).toLocaleString("en-IN") : ""}
         </td>
       </tr>
+    `;
+  }
+
+  // जर Google Sheet मेंबर यादी असेल, तर Annexure चे HTML तयार करणे
+  let annexureHtml = "";
+  if (processedMembers.length > 0) {
+    let memberRows = "";
+    let annexureTotalPaid = 0;
+
+    processedMembers.forEach((m, idx) => {
+      if (m.isPaid) annexureTotalPaid += m.amount;
+
+      // Pending लोकांसाठी खास हाईलाईटेड बॅकग्राउंड (Amber/Red Tint)
+      const rowBg = !m.isPaid ? "background-color: #fef3c7 !important; font-weight: bold;" : (idx % 2 === 0 ? "#fcfcfc" : "#ffffff");
+      const statusBadge = m.isPaid 
+        ? `<span style="color: #15803d; background: #ecfdf5; padding: 1px 4px; border-radius: 4px; font-size: 7.5px;">Paid</span>` 
+        : `<span style="color: #b91c1c; background: #fee2e2; padding: 1px 4px; border-radius: 4px; font-size: 7.5px;">PENDING</span>`;
+
+      memberRows += `
+        <tr style="${rowBg}">
+          <td style="text-align: center; width: 25px;">${idx + 1}</td>
+          <td style="font-family: monospace; font-weight: bold; text-align: center; width: 65px;">${m.regId}</td>
+          <td>${m.name}</td>
+          
+          <td style="text-align: center; width: 55px;">${statusBadge}</td>
+          <td style="text-align: right; font-weight: bold; width: 70px;">₹${m.amount.toLocaleString("en-IN")}</td>
+        </tr>
+      `;
+    });
+
+    annexureHtml = `
+      <div class="page-break"></div>
+      <div class="header-container" style="margin-top: 15px;">
+        <h1 class="club-title">${clubName}</h1>
+        <div class="event-title">जोडपत्र (Annexure) : ${eventTitle} - नोंदणी व वर्गणीदार सविस्तर यादी</div>
+      </div>
+      <table>
+        <thead>
+          <tr style="background: #f1f5f9; font-size: 8.5px;">
+            <th style="width: 25px; text-align: center;">#</th>
+            <th style="width: 65px; text-align: center;">Reg ID</th>
+            <th>सदस्याचे पूर्ण नाव</th>
+            <th style="width: 55px; text-align: center;">स्थिती</th>
+            <th style="width: 70px; text-align: right;">रक्कम</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${memberRows}
+          <tr class="footer-total">
+            <td colspan="5" style="text-align: right; color: #15803d;">एकूण जमा वर्गणी (Paid):</td>
+            <td style="text-align: right; color: #15803d;">₹${annexureTotalPaid.toLocaleString("en-IN")}</td>
+          </tr>
+        </tbody>
+      </table>
     `;
   }
 
@@ -66,6 +174,10 @@ export const printFinanceStatement = ({
             font-size: 9px;
             -webkit-print-color-adjust: exact;
             print-color-adjust: exact;
+          }
+          .page-break {
+            page-break-before: always;
+            break-before: page;
           }
           .header-container {
             text-align: center;
@@ -127,9 +239,6 @@ export const printFinanceStatement = ({
             border: 1px solid #e2e8f0;
             vertical-align: middle;
             word-wrap: break-word;
-          }
-          tr:nth-child(even) td {
-            background-color: #fcfcfc;
           }
           .footer-total td {
             background-color: #f1f5f9 !important;
@@ -208,6 +317,8 @@ export const printFinanceStatement = ({
           </tbody>
         </table>
 
+        ${annexureHtml}
+
         <div class="footer-container">
           <div class="audit-sign">खजिनदार / अध्यक्ष स्वाक्षरी: ___________________</div>
           <div class="dev-credit">Printed via JBSC Events App | Developed by Sandesh R. Mahadik</div>
@@ -215,7 +326,9 @@ export const printFinanceStatement = ({
 
         <script>
           window.onload = function() {
-            window.print();
+            setTimeout(() => {
+              window.print();
+            }, 500);
           };
         </script>
       </body>
