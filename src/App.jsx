@@ -12,11 +12,14 @@ import Events from "./modules/admin/Events";
 import Users from "./modules/admin/Users";
 import ManageRegistrations from "./modules/admin/ManageRegistrations";
 import FinanceModule from "./modules/admin/FinanceModule";
-import Gallery from './modules/public/Gallery';
+import Gallery from "./modules/public/Gallery";
 import QrScanner from "./modules/admin/QrScanner";
 import LuckyDrawAdmin from "./modules/admin/LuckyDrawAdmin";
 import { requestNotificationPermission, onForegroundMessage } from "./services/fcmService";
 import NotificationModule from "./modules/admin/NotificationModule";
+import AuctionSetupManager from "./modules/admin/AuctionSetupManager";
+import PublicAuctionScreen from "./modules/public/PublicAuctionScreen";
+import TeamOwnerPortal from "./modules/public/TeamOwnerPortal";
 
 export default function App() {
   useEffect(() => {
@@ -27,10 +30,14 @@ export default function App() {
     onForegroundMessage();
   }, []);
 
-  // फक्त एकच आणि मुख्य return (HashRouter सह) इथे राहील
   return (
     <HashRouter>
       <Routes>
+        {/* Standalone Projector / Public Live Auction Screen (No PublicLayout Navbar) */}
+        <Route path="/auction-live/:auctionId" element={<PublicAuctionScreen />} />
+        <Route path="/auction-team" element={<TeamOwnerPortal />} />
+        <Route path="/auction-team/:auctionId" element={<TeamOwnerPortal />} />
+
         {/* Public Routes */}
         <Route path="/" element={<PublicLayout />}>
           <Route index element={<Home />} />
@@ -54,6 +61,7 @@ export default function App() {
           <Route path="finance" element={<FinanceModule />} />
           <Route path="users" element={<Users />} />
           <Route path="notifications" element={<NotificationModule />} />
+          <Route path="auction" element={<AuctionSetupManager />} />
         </Route>
       </Routes>
     </HashRouter>

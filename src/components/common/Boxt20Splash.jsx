@@ -78,7 +78,7 @@ export default function Boxt20Splash() {
         {/* Top Header: JBSC + Skip Timer */}
         <div className="flex items-center justify-between pb-2.5 border-b border-slate-800">
           <span className="flex items-center gap-1.5 text-xs font-black uppercase tracking-wider text-amber-400">
-            <Trophy className="w-4 h-4 text-amber-400" /> JBSC क्रीडा पर्व २०२६
+            <Trophy className="w-4 h-4 text-amber-400" /> JBSC क्रीडा पर्व २०२७
           </span>
           <button
             type="button"
@@ -95,17 +95,17 @@ export default function Boxt20Splash() {
           {/* Blinking Badge */}
           <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-rose-600 text-white font-black text-xs sm:text-sm tracking-wider uppercase border border-rose-400 shadow-lg shadow-rose-600/40 animate-pulse">
             <span className="w-2 h-2 rounded-full bg-white animate-ping" />
-            🔥 06 DEC 2026 🔥
+            🔥 COMING SOON 🔥
           </div>
 
           {/* Solid Glowing BOXT20 Title (कधीही गायब होणार नाही) */}
           <h1 className="text-4xl sm:text-5xl font-black tracking-tight text-amber-400 drop-shadow-[0_4px_16px_rgba(251,191,36,0.5)] my-1">
-            🏏 BOXT20
+            🏏 KVCUP-2027
           </h1>
 
           {/* 6 Overs Highlight */}
           <div className="inline-block px-3.5 py-1.5 rounded-xl bg-amber-500/20 border border-amber-400 text-amber-300 font-black text-xs sm:text-sm tracking-wide">
-            ⚡ ह्या वर्षी LONG FORMAT मध्ये — <span className="text-white underline decoration-amber-400 font-extrabold">६ षटकांचे थरारक सामने!</span> ⚡
+            ⚡ ह्या वर्षी NEW FORMAT मध्ये — <span className="text-white underline decoration-amber-400 font-extrabold">थरारक सामने!</span> ⚡
           </div>
         </div>
 

@@ -46,7 +46,19 @@ export default function Navbar() {
           {/* Logo & Club Name */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 rounded-xl bg-orange-600 flex items-center justify-center text-white shadow-md group-hover:scale-105 transition-transform">
-              <Trophy className="w-6 h-6" />
+              <img
+  src={`${import.meta.env.BASE_URL}jagewala-baba.jpg`}
+  alt="जागेवाला बाबा स्पोर्ट्स क्लब"
+  className="w-9 h-9 rounded-xl object-cover border border-orange-300 bg-slate-900 shrink-0"
+  onError={(e) => {
+    if (!e.target.dataset.triedPng) {
+      e.target.dataset.triedPng = "true";
+      e.target.src = `${import.meta.env.BASE_URL}jagewala-baba.png`;
+    } else {
+      e.target.style.display = "none";
+    }
+  }}
+/>
             </div>
             <div>
               <span className="text-lg font-bold text-gray-900 block leading-tight">

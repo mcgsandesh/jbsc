@@ -13,7 +13,8 @@ import {
   ExternalLink,
   QrCode,
   Gift,
-  Bell // <-- १. Bell आयकॉन इथे जोडला आहे
+  Bell,
+  Gavel
 } from "lucide-react";
 import { logoutUser } from "../services/authService";
 import { APP_CONFIG } from "../config/constants";
@@ -59,7 +60,8 @@ export default function AdminLayout() {
     canScanQr: true, 
     canManageFinance: isSuperAdmin || isFinance,
     canManageUsers: isSuperAdmin,
-    canManageNotifications: isSuperAdmin, // <-- २. फक्त Superadmin साठी नोटिफिकेशन परवानगी
+    canManageNotifications: isSuperAdmin,
+    canManageAuction: isSuperAdmin,
   };
 
   // 5. Central Route Protection
@@ -70,7 +72,8 @@ export default function AdminLayout() {
     "/admin/users": perms.canManageUsers,
     "/admin/registrations": perms.canViewRegistrations,
     "/admin/scanner": perms.canScanQr,
-    "/admin/notifications": perms.canManageNotifications, // <-- ३. राऊत प्रोटेक्शन
+    "/admin/notifications": perms.canManageNotifications,
+    "/admin/auction": perms.canManageAuction,
   };
 
   const currentPath = location.pathname;
@@ -94,7 +97,8 @@ export default function AdminLayout() {
     ...(perms.canManageFinance ? [{ label: "जमा-खर्च", path: "/admin/finance", icon: IndianRupee }] : []),
     ...(perms.canManageUsers ? [{ label: "परवानगी", path: "/admin/users", icon: Users }] : []),
     ...(perms.canManageEvents ? [{ label: "लकी ड्रॉ", path: "/admin/lucky-draw", icon: Gift }] : []),
-    ...(perms.canManageNotifications ? [{ label: "नोटिफिकेशन्स", path: "/admin/notifications", icon: Bell }] : []), // <-- ४. मेनूमध्ये जोडले
+    ...(perms.canManageAuction ? [{ label: "ऑक्शन", path: "/admin/auction", icon: Gavel }] : []),
+    ...(perms.canManageNotifications ? [{ label: "नोटिफिकेशन्स", path: "/admin/notifications", icon: Bell }] : []),
   ];
 
   const isActive = (path) => location.pathname === path;
