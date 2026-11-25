@@ -238,3 +238,85 @@ export async function importJbscMasterPlayersCsv(csvText) {
 
   return count;
 }
+
+// src/services/playerMasterService.js च्या शेवटी हे फंक्शन्स जोडा
+
+const ALL_MP_CACHE_KEY = "jbsc_mp_all_cache_v1";
+const ALL_MP_CACHE_TTL = 2 * 60 * 1000; // 2 मिनिटे कॅशे
+
+export function normalizePlayerIdCode(rawCode) {
+  const cleaned = String(rawCode || "").trim().toUpperCase();
+  if (!cleaned) return "";
+  if (/^\d+$/.test(cleaned)) {
+    return `JBSC-${cleaned}`;
+  }
+  const match = cleaned.match(/^JBSC[-_\s]*(\d+)$/i);
+  if (match) {
+    return `JBSC-${match[1]}`;
+  }
+  return cleaned;
+}
+
+export async function getCachedMasterPlayers() {
+  try {
+    const raw = sessionStorage.getItem(ALL_MP_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && Date.now() - parsed.ts < ALL_MP_CACHE_TTL && Array.isArray(parsed.list)) {
+        return parsed.list;
+      }
+    }
+  } catch {
+    // ignore cache error
+  }
+
+  const snap = await getDocs(collection(db, "master_players"));
+  const list = [];
+  snap.forEach((d) => {
+    list.push({ id: d.id, ...d.data() });
+  });
+
+  try {
+    sessionStorage.setItem(
+      ALL_MP_CACHE_KEY,
+      JSON.stringify({ ts: Date.now(), list })
+    );
+  } catch {
+    // ignore cache error
+  }
+  return list;
+}
+
+/**
+ * Player ID (उदा. "153" किंवा "JBSC-153"), नाव (उदा. "Prashant Gaonkar") किंवा Mobile वरून शोधणे
+ */
+export async function searchJbscMasterPlayers(queryText) {
+  const q = String(queryText || "").trim();
+  if (!q) return [];
+
+  const normalizedCode = normalizePlayerIdCode(q);
+  const qLower = q.toLowerCase();
+  const mobDigits = normalizeMobile10(q);
+
+  // 1. आधी 10 अंकी मोबाईल असेल तर थेट 1-doc lookup
+  if (mobDigits.length === 10) {
+    const direct = await lookupJbscPlayerByMobile(mobDigits);
+    if (direct) return [direct];
+  }
+
+  // 2. Player ID किंवा नावावरून cached/backend master_players मधून शोधणे
+  const all = await getCachedMasterPlayers();
+  return all.filter((p) => {
+    const pidUpper = String(p.playerId || "").trim().toUpperCase();
+    const nameLower = String(p.fullName || p.name || "").trim().toLowerCase();
+    const pMob = normalizeMobile10(p.mobile);
+
+    const codeMatch =
+      Boolean(normalizedCode) &&
+      (pidUpper === normalizedCode || pidUpper.includes(q.toUpperCase()));
+    const nameMatch = Boolean(qLower) && nameLower.includes(qLower);
+    const mobMatch = Boolean(mobDigits) && pMob.includes(mobDigits);
+
+    return codeMatch || nameMatch || mobMatch;
+  });
+}

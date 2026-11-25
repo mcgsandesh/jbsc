@@ -1,25 +1,27 @@
 // src/layouts/AdminLayout.jsx
 import React, { useState } from "react";
 import { Outlet, Link, useNavigate, useLocation, Navigate } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  CalendarDays, 
-  Users, 
-  IndianRupee, 
-  FileText, 
-  LogOut, 
-  Menu, 
+import {
+  LayoutDashboard,
+  CalendarDays,
+  Users,
+  IndianRupee,
+  FileText,
+  LogOut,
+  Menu,
   X,
   ExternalLink,
   QrCode,
   Gift,
   Bell,
-  Gavel
+  Gavel,
+  Trophy
 } from "lucide-react";
 import { logoutUser } from "../services/authService";
 import { APP_CONFIG } from "../config/constants";
 import { useAuth } from "../context/AuthContext";
 
+// === SECTION: ADMIN LAYOUT COMPONENT START ===
 export default function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const navigate = useNavigate();
@@ -52,16 +54,17 @@ export default function AdminLayout() {
   const isFinance = userRole === "finance_admin" || userRole === "finance";
   const isDesk = userRole === "desk_admin" || userRole === "desk";
 
-  // 4. Tested Role Permissions
+  // 4. Role Permissions (सध्या फक्त superadmin ला Scoring)
   const perms = {
     canViewDashboard: isSuperAdmin || isFinance || isDesk,
     canManageEvents: isSuperAdmin,
-    canViewRegistrations: true, 
-    canScanQr: true, 
+    canViewRegistrations: true,
+    canScanQr: true,
     canManageFinance: isSuperAdmin || isFinance,
     canManageUsers: isSuperAdmin,
     canManageNotifications: isSuperAdmin,
     canManageAuction: isSuperAdmin,
+    canManageScoring: isSuperAdmin
   };
 
   // 5. Central Route Protection
@@ -74,6 +77,7 @@ export default function AdminLayout() {
     "/admin/scanner": perms.canScanQr,
     "/admin/notifications": perms.canManageNotifications,
     "/admin/auction": perms.canManageAuction,
+    "/admin/scoring": perms.canManageScoring
   };
 
   const currentPath = location.pathname;
@@ -90,22 +94,38 @@ export default function AdminLayout() {
 
   // 6. Navigation Menu Items (Desktop Sidebar & Mobile Bottom Bar)
   const navItems = [
-    ...(perms.canViewDashboard ? [{ label: "डॅशबोर्ड", path: "/admin/dashboard", icon: LayoutDashboard }] : []),
-    ...(perms.canManageEvents ? [{ label: "इव्हेंट्स", path: "/admin/events", icon: CalendarDays }] : []),
+    ...(perms.canViewDashboard
+      ? [{ label: "डॅशबोर्ड", path: "/admin/dashboard", icon: LayoutDashboard }]
+      : []),
+    ...(perms.canManageEvents
+      ? [{ label: "इव्हेंट्स", path: "/admin/events", icon: CalendarDays }]
+      : []),
     { label: "नोंदणी", path: "/admin/registrations", icon: FileText },
     { label: "QR स्कॅन", path: "/admin/scanner", icon: QrCode },
-    ...(perms.canManageFinance ? [{ label: "जमा-खर्च", path: "/admin/finance", icon: IndianRupee }] : []),
-    ...(perms.canManageUsers ? [{ label: "परवानगी", path: "/admin/users", icon: Users }] : []),
-    ...(perms.canManageEvents ? [{ label: "लकी ड्रॉ", path: "/admin/lucky-draw", icon: Gift }] : []),
-    ...(perms.canManageAuction ? [{ label: "ऑक्शन", path: "/admin/auction", icon: Gavel }] : []),
-    ...(perms.canManageNotifications ? [{ label: "नोटिफिकेशन्स", path: "/admin/notifications", icon: Bell }] : []),
+    ...(perms.canManageFinance
+      ? [{ label: "जमा-खर्च", path: "/admin/finance", icon: IndianRupee }]
+      : []),
+    ...(perms.canManageUsers
+      ? [{ label: "परवानगी", path: "/admin/users", icon: Users }]
+      : []),
+    ...(perms.canManageEvents
+      ? [{ label: "लकी ड्रॉ", path: "/admin/lucky-draw", icon: Gift }]
+      : []),
+    ...(perms.canManageAuction
+      ? [{ label: "ऑक्शन", path: "/admin/auction", icon: Gavel }]
+      : []),
+    ...(perms.canManageScoring
+      ? [{ label: "स्कोअरिंग", path: "/admin/scoring", icon: Trophy }]
+      : []),
+    ...(perms.canManageNotifications
+      ? [{ label: "नोटिफिकेशन्स", path: "/admin/notifications", icon: Bell }]
+      : [])
   ];
 
   const isActive = (path) => location.pathname === path;
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row font-sans text-slate-800 antialiased">
-      
       {/* Mobile Top Header */}
       <header className="md:hidden sticky top-0 z-30 flex items-center justify-between bg-white px-4 py-3 border-b border-slate-200 shadow-sm">
         <div className="flex items-center gap-2">
@@ -194,7 +214,7 @@ export default function AdminLayout() {
 
       {/* Backdrop for mobile drawer */}
       {sidebarOpen && (
-        <div 
+        <div
           onClick={() => setSidebarOpen(false)}
           className="md:hidden fixed inset-0 z-40 bg-black/50 backdrop-blur-sm"
         />
@@ -207,10 +227,7 @@ export default function AdminLayout() {
 
       {/* Mobile Bottom Navigation */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-slate-200 shadow-[0_-2px_10px_rgba(0,0,0,0.06)]">
-        <div 
-          className="grid h-16" 
-          style={{ gridTemplateColumns: `repeat(${navItems.length}, minmax(0, 1fr))` }}
-        >
+        <div className="flex items-center h-16 overflow-x-auto px-1 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]">
           {navItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -219,12 +236,20 @@ export default function AdminLayout() {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`flex flex-col items-center justify-center gap-1 transition-colors ${
-                  active ? "text-orange-600" : "text-slate-500 hover:text-slate-900"
+                className={`shrink-0 min-w-[68px] flex flex-col items-center justify-center gap-1 px-2 transition-colors ${
+                  active
+                    ? "text-orange-600"
+                    : "text-slate-500 hover:text-slate-900"
                 }`}
               >
-                <Icon className={`w-5 h-5 ${active ? "stroke-[2.5]" : "stroke-2"}`} />
-                <span className={`text-[10px] ${active ? "font-bold" : "font-medium"} truncate px-1`}>
+                <Icon
+                  className={`w-5 h-5 ${active ? "stroke-[2.5]" : "stroke-2"}`}
+                />
+                <span
+                  className={`text-[10px] whitespace-nowrap ${
+                    active ? "font-bold" : "font-medium"
+                  }`}
+                >
                   {item.label}
                 </span>
               </Link>
@@ -232,7 +257,7 @@ export default function AdminLayout() {
           })}
         </div>
       </nav>
-
     </div>
   );
 }
+// === SECTION: ADMIN LAYOUT COMPONENT END ===
