@@ -1,16 +1,19 @@
 // src/services/scoringLocalEngine.js
+import {
+  MATCH_FORMATS,
+  calculateSingleBallImpact,
+  computeNextStrikeAfterBall,
+  formatOversFromBalls
+} from "./matchRulesHelper";
 
-// === SECTION: STORAGE KEYS & CONSTANTS START ===
+export { MATCH_FORMATS, formatOversFromBalls };
+
+// === SECTION 01: STORAGE, CONSTANTS & UTILITIES START ===
 const STORAGE_KEYS = {
   TOURNAMENTS: "jbsc_score_tournaments_v1",
   TEAMS: "jbsc_score_teams_v1",
   PLAYERS: "jbsc_score_players_v1",
   MATCHES: "jbsc_score_matches_v1"
-};
-
-export const MATCH_FORMATS = {
-  ONE_DAY: "one_day",
-  TEST: "test"
 };
 
 export const MATCH_TITLES = [
@@ -47,9 +50,9 @@ function writeList(key, list) {
     console.warn("localStorage write failed:", err);
   }
 }
-// === SECTION: STORAGE KEYS & CONSTANTS END ===
+// === SECTION 01: STORAGE, CONSTANTS & UTILITIES END ===
 
-// === SECTION: TOURNAMENT CRUD & GROUPS START ===
+// === SECTION 02: TOURNAMENTS & GROUP POINTS CONFIG START ===
 export function getTournaments() {
   return readList(STORAGE_KEYS.TOURNAMENTS);
 }
@@ -70,10 +73,23 @@ export function createTournament(input = {}) {
       : [];
 
   const initialGroupTeams = {};
+  const initialGroupPointsConfig = {};
+
   defaultGroups.forEach((g) => {
     initialGroupTeams[g] = Array.isArray(input.groupTeams?.[g])
       ? input.groupTeams[g]
       : [];
+    initialGroupPointsConfig[g] = {
+      winPoints: Number(
+        input.groupPointsConfig?.[g]?.winPoints ?? input.pointsConfig?.win ?? 2
+      ),
+      lossPoints: Number(
+        input.groupPointsConfig?.[g]?.lossPoints ?? input.pointsConfig?.loss ?? 0
+      ),
+      tiePoints: Number(
+        input.groupPointsConfig?.[g]?.tiePoints ?? input.pointsConfig?.tie ?? 1
+      )
+    };
   });
 
   const tournament = {
@@ -84,10 +100,11 @@ export function createTournament(input = {}) {
     startDate: String(input.startDate || "").trim(),
     endDate: String(input.endDate || "").trim(),
     bannerUrl: String(input.bannerUrl || "").trim(),
-    mode, // "league" | "single"
-    format, // "one_day" | "test"
+    mode,
+    format,
     groups: defaultGroups,
-    groupTeams: initialGroupTeams, // { "Group A": [teamId1, teamId2] }
+    groupTeams: initialGroupTeams,
+    groupPointsConfig: initialGroupPointsConfig,
     tournamentTeamIds: Array.isArray(input.tournamentTeamIds)
       ? input.tournamentTeamIds
       : [],
@@ -118,6 +135,10 @@ export function updateTournament(tournamentId, patch = {}) {
           : patch.format === MATCH_FORMATS.ONE_DAY
           ? MATCH_FORMATS.ONE_DAY
           : t.format || MATCH_FORMATS.ONE_DAY,
+      groupPointsConfig: {
+        ...(t.groupPointsConfig || {}),
+        ...(patch.groupPointsConfig || {})
+      },
       pointsConfig: {
         ...(t.pointsConfig || { win: 2, tie: 1, noResult: 1, loss: 0 }),
         ...(patch.pointsConfig || {})
@@ -131,11 +152,13 @@ export function updateTournament(tournamentId, patch = {}) {
 }
 
 export function deleteTournament(tournamentId) {
-  const next = getTournaments().filter((t) => t.id !== tournamentId);
-  writeList(STORAGE_KEYS.TOURNAMENTS, next);
+  writeList(
+    STORAGE_KEYS.TOURNAMENTS,
+    getTournaments().filter((t) => t.id !== tournamentId)
+  );
 }
 
-export function addTournamentGroup(tournamentId, groupName) {
+export function addTournamentGroup(tournamentId, groupName, pointsCfg = null) {
   const clean = String(groupName || "").trim();
   const t = getTournaments().find((item) => item.id === tournamentId);
   if (!t || !clean) return t;
@@ -145,7 +168,61 @@ export function addTournamentGroup(tournamentId, groupName) {
     ...(t.groupTeams || {}),
     [clean]: Array.isArray(t.groupTeams?.[clean]) ? t.groupTeams[clean] : []
   };
-  return updateTournament(tournamentId, { groups, groupTeams });
+  const groupPointsConfig = {
+    ...(t.groupPointsConfig || {}),
+    [clean]: {
+      winPoints: Number(
+        pointsCfg?.winPoints ??
+          t.groupPointsConfig?.[clean]?.winPoints ??
+          t.pointsConfig?.win ??
+          2
+      ),
+      lossPoints: Number(
+        pointsCfg?.lossPoints ??
+          t.groupPointsConfig?.[clean]?.lossPoints ??
+          t.pointsConfig?.loss ??
+          0
+      ),
+      tiePoints: Number(
+        pointsCfg?.tiePoints ??
+          t.groupPointsConfig?.[clean]?.tiePoints ??
+          t.pointsConfig?.tie ??
+          1
+      )
+    }
+  };
+
+  return updateTournament(tournamentId, {
+    groups,
+    groupTeams,
+    groupPointsConfig
+  });
+}
+
+export function setGroupPointsConfig(tournamentId, groupName, config = {}) {
+  const clean = String(groupName || "").trim();
+  const t = getTournaments().find((item) => item.id === tournamentId);
+  if (!t || !clean) return t;
+
+  const prev = t.groupPointsConfig?.[clean] || {};
+  const nextGroupPointsConfig = {
+    ...(t.groupPointsConfig || {}),
+    [clean]: {
+      winPoints: Number(
+        config.winPoints ?? prev.winPoints ?? t.pointsConfig?.win ?? 2
+      ),
+      lossPoints: Number(
+        config.lossPoints ?? prev.lossPoints ?? t.pointsConfig?.loss ?? 0
+      ),
+      tiePoints: Number(
+        config.tiePoints ?? prev.tiePoints ?? t.pointsConfig?.tie ?? 1
+      )
+    }
+  };
+
+  return updateTournament(tournamentId, {
+    groupPointsConfig: nextGroupPointsConfig
+  });
 }
 
 export function addTeamToTournament(tournamentId, teamId, groupName = "") {
@@ -197,9 +274,9 @@ export function removeTeamFromTournament(tournamentId, teamId, groupName = "") {
     groupTeams: cleanedGroups
   });
 }
-// === SECTION: TOURNAMENT CRUD & GROUPS END ===
+// === SECTION 02: TOURNAMENT & GROUP POINTS CONFIG END ===
 
-// === SECTION: TEAMS & PLAYERS (PLAYING / BENCH) START ===
+// === SECTION 03: TEAMS & PLAYERS MANAGEMENT START ===
 export function getTeams() {
   return readList(STORAGE_KEYS.TEAMS);
 }
@@ -271,9 +348,7 @@ export function createPlayer(input = {}) {
     return false;
   });
 
-  if (existing) {
-    return existing;
-  }
+  if (existing) return existing;
 
   const seq = list.length + 101;
   const player = {
@@ -319,33 +394,85 @@ export function setTeamPlayerLineStatus(teamId, playerId, lineStatus) {
   };
   return updateTeam(teamId, { squadRoster: roster });
 }
-// === SECTION: TEAMS & PLAYERS (PLAYING / BENCH) END ===
+// === SECTION 03: TEAMS & PLAYERS MANAGEMENT END ===
 
-// === SECTION: FIXTURE, TOSS & BALL-BY-BALL ENGINE START ===
-function createEmptyInnings(inningsNumber, battingTeamId, bowlingTeamId) {
+// === SECTION 04: EMPTY INNINGS FACTORY START ===
+function createEmptyInnings(
+  inningsNumber,
+  battingTeamId,
+  bowlingTeamId,
+  isSuperOver = false
+) {
   return {
     inningsNumber,
+    isSuperOver: Boolean(isSuperOver),
     battingTeamId,
     bowlingTeamId,
     runs: 0,
     wickets: 0,
     legalBalls: 0,
+    bonusRuns: 0,
     declared: false,
     declaredRuns: null,
     balls: [],
     strikerId: "",
     nonStrikerId: "",
     bowlerId: "",
-    playerStats: {}
+    playerStats: {},
+    outPlayerIds: []
   };
+}
+// === SECTION 04: EMPTY INNINGS FACTORY END ===
+
+// === SECTION 05: MATCH FIXTURES & AUTO MATCH NUMBERING (Match 1, Match 2...) START ===
+function resolveNextMatchNumber(input, existingMatches = [], existingMatchObj = null) {
+  const explicitNum = Number(
+    input.matchNumber ??
+      input.matchNo ??
+      existingMatchObj?.matchNumber ??
+      existingMatchObj?.matchNo ??
+      0
+  );
+  if (explicitNum > 0) return explicitNum;
+
+  const targetTourId =
+    input.tournamentId || existingMatchObj?.tournamentId || "";
+  const targetId = input.id || existingMatchObj?.id || "";
+
+  const sameTournamentMatches = (Array.isArray(existingMatches) ? existingMatches : []).filter(
+    (m) => m && m.id !== targetId && (m.tournamentId || "") === targetTourId
+  );
+
+  const highestNum = sameTournamentMatches.reduce((maxVal, m) => {
+    const n = Number(m.matchNumber ?? m.matchNo ?? 0);
+    return n > maxVal ? n : maxVal;
+  }, 0);
+
+  return Math.max(sameTournamentMatches.length + 1, highestNum + 1);
 }
 
 export function getMatches() {
-  return readList(STORAGE_KEYS.MATCHES);
+  const rawList = readList(STORAGE_KEYS.MATCHES);
+  const perTourneyCounter = {};
+
+  return rawList.map((m) => {
+    const tKey = m?.tournamentId || "__standalone__";
+    perTourneyCounter[tKey] = (perTourneyCounter[tKey] || 0) + 1;
+    const num = Number(m?.matchNumber ?? m?.matchNo ?? 0) || perTourneyCounter[tKey];
+    return {
+      ...m,
+      matchNumber: num,
+      matchLabel: m?.matchLabel || `Match ${num}`
+    };
+  });
 }
 
 export function saveMatchFixture(input = {}) {
   const matches = getMatches();
+  const existingMatchObj = input.id
+    ? matches.find((m) => m.id === input.id) || null
+    : null;
+
   const tournament = input.tournamentId
     ? getTournaments().find((t) => t.id === input.tournamentId)
     : null;
@@ -366,16 +493,19 @@ export function saveMatchFixture(input = {}) {
   const teamAId = input.teamAId || "";
   const teamBId = input.teamBId || "";
 
-  const firstInnings = createEmptyInnings(1, teamAId, teamBId);
+  const firstInnings = createEmptyInnings(1, teamAId, teamBId, false);
+  const matchNumber = resolveNextMatchNumber(input, matches, existingMatchObj);
 
   const match = {
     id: input.id || uid("mt"),
+    matchNumber,
+    matchLabel: `Match ${matchNumber}`,
     tournamentId: tournament?.id || input.tournamentId || "",
     tournamentName:
       tournament?.name || input.tournamentName || "Standalone Match",
     season: tournament?.season || input.season || "2026",
     matchCategory:
-      input.matchCategory === "other" ? "other" : "points_table", // "points_table" | "other"
+      input.matchCategory === "other" ? "other" : "points_table",
     groupName: String(input.groupName || "").trim(),
     matchTitle: String(input.matchTitle || "Match").trim(),
     format,
@@ -391,14 +521,15 @@ export function saveMatchFixture(input = {}) {
     playersPerSide,
     scorerName: String(input.scorerName || "").trim(),
     status: input.status || "scheduled",
-    toss: input.toss || {
-      wonByTeamId: "",
-      decision: ""
-    },
-    activeInningsIndex: 0,
+    toss: input.toss || { wonByTeamId: "", decision: "" },
+    activeInningsIndex:
+      typeof input.activeInningsIndex === "number"
+        ? input.activeInningsIndex
+        : 0,
     innings: input.innings?.length ? input.innings : [firstInnings],
     resultText: input.resultText || "",
     winnerTeamId: input.winnerTeamId || "",
+    isTied: Boolean(input.isTied ?? false),
     updatedAt: new Date().toISOString()
   };
 
@@ -436,7 +567,7 @@ export function applyMatchToss(matchId, wonByTeamId, decision) {
     status: "live",
     toss: { wonByTeamId, decision: cleanDecision },
     activeInningsIndex: 0,
-    innings: [createEmptyInnings(1, battingFirstId, bowlingFirstId)],
+    innings: [createEmptyInnings(1, battingFirstId, bowlingFirstId, false)],
     updatedAt: new Date().toISOString()
   };
 
@@ -446,15 +577,17 @@ export function applyMatchToss(matchId, wonByTeamId, decision) {
   );
   return updatedMatch;
 }
+// === SECTION 05: MATCH FIXTURES & AUTO MATCH NUMBERING (Match 1, Match 2...) END ===
 
-// === SECTION: RECOMPUTE INNINGS & MAGIC BALL ENGINE START ===
+// === SECTION 06: RECOMPUTE INNINGS, BALL RECORDING & UNDO START ===
 export function recomputeInningsState(
   innings,
   ballsPerOver,
   countWideAsBall,
-  countNoBallAsBall
+  countNoBallAsBall,
+  playerMap = {}
 ) {
-  let runs = 0;
+  let runs = Number(innings.bonusRuns || 0);
   let wickets = 0;
   let legalBalls = 0;
   const playerStats = {};
@@ -479,159 +612,127 @@ export function recomputeInningsState(
     return playerStats[pid];
   };
 
-  let strikerId = innings.strikerId || "";
-  let nonStrikerId = innings.nonStrikerId || "";
-  let bowlerId = innings.bowlerId || "";
+  let currentStrikerId = innings.strikerId || "";
+  let currentNonStrikerId = innings.nonStrikerId || "";
+  const currentBowlerId = innings.bowlerId || "";
+  const ballsList = Array.isArray(innings.balls) ? innings.balls : [];
 
-  for (const b of innings.balls || []) {
-    const isMagic = Boolean(b.isMagicBall);
-    const isDeclare = Boolean(b.isDeclare);
-    const ranBetween = Boolean(b.ranBetweenWickets);
-    const extType = b.extrasType || "none";
-    const baseBatRuns = Number(b.runs || 0);
-    const baseExtRuns = Number(b.extrasRuns || 0);
+  ballsList.forEach((b, idx) => {
+    const isLastBall = idx === ballsList.length - 1;
+    const imp = calculateSingleBallImpact(b, {
+      countWideAsBall,
+      countNoBallAsBall
+    });
 
-    let effectiveBatRuns = baseBatRuns;
-    let effectiveExtRuns = baseExtRuns;
-    let wicketCountForBall = b.isWicket ? 1 : 0;
-    let legalBallIncrement = 0;
+    runs += imp.totalRuns;
+    wickets += imp.wicketsInc;
+    legalBalls += imp.legalBallsInc;
 
-    if (isMagic) {
-      if (extType === "wd") {
-        // Magic Wide: किमान 2 किंवा दिलेले अतिरिक्त दुप्पट
-        effectiveBatRuns = 0;
-        effectiveExtRuns = Math.max(2, baseExtRuns * 2);
-        legalBallIncrement = countWideAsBall ? 1 : 0;
-      } else if (extType === "nb") {
-        // Magic No Ball: 2 NB runs + दुप्पट bat runs (उदा. NB+2 -> 2 + 4 = 6 runs)
-        effectiveBatRuns = baseBatRuns * 2;
-        effectiveExtRuns = 2;
-        legalBallIncrement = countNoBallAsBall ? 1 : 0;
-      } else if (extType === "bye" || extType === "lb") {
-        // Magic Bye / LB: धावा दुप्पट (उदा. 1 Bye -> 2 runs, 29 + 2 = 31)
-        effectiveBatRuns = 0;
-        effectiveExtRuns = Math.max(2, baseExtRuns * 2);
-        legalBallIncrement = 1;
-      } else if (baseBatRuns === 0 && !b.isWicket) {
-        // Magic Dot Ball: 2 balls मोजले जातात
-        effectiveBatRuns = 0;
-        effectiveExtRuns = 0;
-        legalBallIncrement = 2;
-      } else {
-        // Magic Normal Runs (1->2, 2->4, 4->8)
-        effectiveBatRuns = baseBatRuns * 2;
-        effectiveExtRuns = 0;
-        legalBallIncrement = 1;
-      }
-
-      if (b.isWicket) {
-        wicketCountForBall = 2;
-      }
-    } else {
-      effectiveBatRuns = baseBatRuns;
-      effectiveExtRuns = baseExtRuns;
-      const countsLegal =
-        extType === "none" ||
-        extType === "bye" ||
-        extType === "lb" ||
-        (extType === "wd" && countWideAsBall) ||
-        (extType === "nb" && countNoBallAsBall);
-      legalBallIncrement = countsLegal ? 1 : 0;
-    }
-
-    const totalBallRuns = effectiveBatRuns + effectiveExtRuns;
-    runs += totalBallRuns;
-    wickets += wicketCountForBall;
-    legalBalls += legalBallIncrement;
-
+    const runOutVictimId = b.runOutPlayerId || b.strikerId || "";
     const sStat = ensureStat(b.strikerId);
     const bStat = ensureStat(b.bowlerId);
 
     if (sStat) {
-      if (extType !== "wd") {
+      if (imp.extType !== "wd") {
         sStat.balls +=
-          isMagic && extType === "none" && baseBatRuns === 0 && !b.isWicket
+          imp.isMagic &&
+          imp.extType === "none" &&
+          imp.baseBat === 0 &&
+          !b.isWicket
             ? 2
             : 1;
       }
-      if (extType === "none" || extType === "nb") {
-        sStat.runs += effectiveBatRuns;
-        if (effectiveBatRuns === 4) sStat.fours += 1;
-        if (effectiveBatRuns === 6) sStat.sixes += 1;
+      if (imp.extType === "none" || imp.extType === "nb") {
+        sStat.runs += imp.effBat;
+        if (imp.effBat === 4) sStat.fours += 1;
+        if (imp.effBat === 6) sStat.sixes += 1;
       }
-      if (b.isWicket && b.strikerId) {
+    }
+
+    if (b.isWicket) {
+      const bowlerName = playerMap?.[b.bowlerId]?.name || "";
+      const fielderName = playerMap?.[b.fielderId]?.name || "";
+
+      if (imp.isRunOut) {
+        const roStat = ensureStat(runOutVictimId);
+        if (roStat) {
+          roStat.out = true;
+          roStat.dismissalText = `run out (${imp.baseBat}r)${
+            imp.isNoBall ? " NB" : ""
+          }`;
+        }
+        if (runOutVictimId) outPlayerIds.add(runOutVictimId);
+      } else if (b.strikerId && sStat) {
         sStat.out = true;
-        sStat.dismissalText = b.wicketType || "out";
+        if (imp.isMagic) {
+          sStat.dismissalText = "out in magic";
+        } else if (b.wicketType === "Caught" && fielderName) {
+          sStat.dismissalText = bowlerName
+            ? `c ${fielderName} b ${bowlerName}`
+            : `c ${fielderName}`;
+        } else if (b.wicketType === "Stumped" && fielderName) {
+          sStat.dismissalText = bowlerName
+            ? `st ${fielderName} b ${bowlerName}`
+            : `st ${fielderName}`;
+        } else {
+          sStat.dismissalText = b.wicketType || "out";
+        }
         outPlayerIds.add(b.strikerId);
       }
     }
 
-    if (b.isWicket && isMagic && b.magicTargetPlayerId) {
-    const mStat = ensureStat(b.magicTargetPlayerId);
-    if (mStat) {
+    if (b.isWicket && imp.isMagic && b.magicTargetPlayerId) {
+      const mStat = ensureStat(b.magicTargetPlayerId);
+      if (mStat) {
         mStat.out = true;
         mStat.dismissalText = "out in magic";
         outPlayerIds.add(b.magicTargetPlayerId);
-    }
+      }
     }
 
     if (bStat) {
-      if (extType !== "bye" && extType !== "lb") {
-        bStat.runsConceded += totalBallRuns;
+      if (imp.extType !== "bye" && imp.extType !== "lb") {
+        bStat.runsConceded += imp.totalRuns;
       }
-      if (legalBallIncrement > 0) {
-        bStat.ballsBowled += legalBallIncrement;
+      if (imp.legalBallsInc > 0) {
+        bStat.ballsBowled += imp.legalBallsInc;
       }
-      if (b.isWicket && b.wicketType !== "run_out") {
-        bStat.wickets += wicketCountForBall;
-      }
-    }
-
-    // Strike Rotation:
-    // - Declare असेल तर strike बदलत नाही
-    // - इतर वेळी धावलेल्या धावांनुसार (base runs / base extras) विषम धावांवर strike बदलते
-    const baseRunsForRotation =
-      extType === "none" || extType === "nb"
-        ? baseBatRuns
-        : extType === "bye" || extType === "lb"
-        ? baseExtRuns
-        : Math.max(0, baseExtRuns - 1);
-
-    const shouldSwapStrike = isDeclare
-      ? ranBetween
-      : baseRunsForRotation % 2 === 1;
-
-    if (shouldSwapStrike && strikerId && nonStrikerId) {
-      const temp = strikerId;
-      strikerId = nonStrikerId;
-      nonStrikerId = temp;
-    }
-
-    // Over पूर्ण झाल्यावर strike बदलते
-    if (legalBallIncrement > 0 && legalBalls % ballsPerOver === 0) {
-      if (strikerId && nonStrikerId) {
-        const temp = strikerId;
-        strikerId = nonStrikerId;
-        nonStrikerId = temp;
+      if (b.isWicket && !imp.isRunOut && !imp.isNoBall) {
+        bStat.wickets += imp.wicketsInc;
       }
     }
-  }
+
+    if (isLastBall) {
+      const nextStrike = computeNextStrikeAfterBall(
+        b,
+        imp,
+        legalBalls,
+        ballsPerOver,
+        currentStrikerId,
+        currentNonStrikerId
+      );
+      currentStrikerId = nextStrike.strikerId;
+      currentNonStrikerId = nextStrike.nonStrikerId;
+    }
+  });
+
+  const finalOutIds = Array.from(outPlayerIds);
+  if (finalOutIds.includes(currentStrikerId)) currentStrikerId = "";
+  if (finalOutIds.includes(currentNonStrikerId)) currentNonStrikerId = "";
 
   return {
     ...innings,
-    runs,
+    runs: Math.max(0, runs),
     wickets,
     legalBalls,
-    strikerId,
-    nonStrikerId,
-    bowlerId,
+    strikerId: currentStrikerId,
+    nonStrikerId: currentNonStrikerId,
+    bowlerId: currentBowlerId,
     playerStats,
-    outPlayerIds: Array.from(outPlayerIds)
+    outPlayerIds: finalOutIds
   };
 }
-// === SECTION: RECOMPUTE INNINGS & MAGIC BALL ENGINE END ===
 
-// === SECTION: RECORD & UNDO BALL WITH BATTER RESTORE START ===
 export function recordMatchBall(matchId, ballInput = {}) {
   const matches = getMatches();
   const match = matches.find((m) => m.id === matchId);
@@ -653,8 +754,13 @@ export function recordMatchBall(matchId, ballInput = {}) {
     runs: Number(ballInput.runs || 0),
     extrasType: ballInput.extrasType || "none",
     extrasRuns: Number(ballInput.extrasRuns || 0),
+    isNoBall: Boolean(ballInput.isNoBall || ballInput.extrasType === "nb"),
     isWicket: Boolean(ballInput.isWicket),
+    isRunOut: Boolean(ballInput.isRunOut || ballInput.wicketType === "Run Out"),
     wicketType: ballInput.wicketType || "",
+    fielderId: ballInput.fielderId || "",
+    runOutPlayerId: ballInput.runOutPlayerId || "",
+    runOutRunNumber: Number(ballInput.runOutRunNumber || 0),
     isMagicBall: Boolean(ballInput.isMagicBall),
     magicTargetPlayerId: ballInput.magicTargetPlayerId || "",
     isDeclare: Boolean(ballInput.isDeclare),
@@ -667,13 +773,8 @@ export function recordMatchBall(matchId, ballInput = {}) {
     timestamp: new Date().toISOString()
   };
 
-  const nextInnRaw = {
-    ...currentInn,
-    balls: [...(currentInn.balls || []), newBall]
-  };
-
   const recomputedInn = recomputeInningsState(
-    nextInnRaw,
+    { ...currentInn, balls: [...(currentInn.balls || []), newBall] },
     bpo,
     Boolean(match.countWideAsBall),
     Boolean(match.countNoBallAsBall)
@@ -699,36 +800,26 @@ export function undoLastMatchBall(matchId) {
 
   const idx = match.activeInningsIndex || 0;
   const currentInn = match.innings[idx];
-  if (
-    !currentInn ||
-    !Array.isArray(currentInn.balls) ||
-    currentInn.balls.length === 0
-  ) {
-    return match;
-  }
+  if (!currentInn || !(currentInn.balls || []).length) return match;
 
   const lastBall = currentInn.balls[currentInn.balls.length - 1];
   const remainingBalls = currentInn.balls.slice(0, -1);
 
-  const nextInnRaw = {
-    ...currentInn,
-    declared: false,
-    declaredRuns: null,
-    balls: remainingBalls,
-    // चेंडू पडण्यापूर्वीचा जुना striker / non-striker परत आणा
-    strikerId: lastBall?.beforeBallStrikerId || currentInn.strikerId || "",
-    nonStrikerId:
-      lastBall?.beforeBallNonStrikerId || currentInn.nonStrikerId || ""
-  };
-
   const recomputedInn = recomputeInningsState(
-    nextInnRaw,
+    {
+      ...currentInn,
+      declared: false,
+      declaredRuns: null,
+      balls: remainingBalls,
+      strikerId: lastBall?.beforeBallStrikerId || currentInn.strikerId || "",
+      nonStrikerId:
+        lastBall?.beforeBallNonStrikerId || currentInn.nonStrikerId || ""
+    },
     Math.max(1, Number(match.ballsPerOver || 6)),
     Boolean(match.countWideAsBall),
     Boolean(match.countNoBallAsBall)
   );
 
-  // recomputeInningsState नंतरही lastBall वरील beforeBallStrikerId / beforeBallNonStrikerId ला प्राधान्य द्या
   const restoredInn = {
     ...recomputedInn,
     strikerId: lastBall?.beforeBallStrikerId || recomputedInn.strikerId || "",
@@ -749,7 +840,79 @@ export function undoLastMatchBall(matchId) {
   );
   return updatedMatch;
 }
-// === SECTION: RECORD & UNDO BALL WITH BATTER RESTORE END ===
+// === SECTION 06: RECOMPUTE INNINGS, BALL RECORDING & UNDO END ===
+
+// === SECTION 07: BONUS RUNS, SUPER OVER & INNINGS FLOW START ===
+export function applyBonusRuns(matchId, signedDelta) {
+  const matches = getMatches();
+  const match = matches.find((m) => m.id === matchId);
+  if (!match) return null;
+
+  const idx = match.activeInningsIndex || 0;
+  const currentInn = match.innings[idx];
+  if (!currentInn) return match;
+
+  const recomputedInn = recomputeInningsState(
+    {
+      ...currentInn,
+      bonusRuns: Number(currentInn.bonusRuns || 0) + Number(signedDelta || 0)
+    },
+    Math.max(1, Number(match.ballsPerOver || 6)),
+    Boolean(match.countWideAsBall),
+    Boolean(match.countNoBallAsBall)
+  );
+
+  const updatedMatch = {
+    ...match,
+    innings: match.innings.map((inn, i) => (i === idx ? recomputedInn : inn)),
+    updatedAt: new Date().toISOString()
+  };
+
+  writeList(
+    STORAGE_KEYS.MATCHES,
+    matches.map((m) => (m.id === matchId ? updatedMatch : m))
+  );
+  return updatedMatch;
+}
+
+export function startSuperOverInnings(matchId, forcedBatId = "", forcedBowlId = "") {
+  const matches = getMatches();
+  const match = matches.find((m) => m.id === matchId);
+  if (!match) return null;
+
+  const idx = match.activeInningsIndex || 0;
+  const curr = match.innings[idx];
+  if (!curr) return match;
+
+  const batId = forcedBatId || curr.bowlingTeamId || match.teamBId;
+  const bowlId =
+    forcedBowlId || (batId === match.teamAId ? match.teamBId : match.teamAId);
+
+  const superOverInn = createEmptyInnings(
+    (match.innings?.length || 0) + 1,
+    batId,
+    bowlId,
+    true
+  );
+
+  const nextInningsArr = [...(match.innings || []), superOverInn];
+  const updatedMatch = {
+    ...match,
+    status: "live",
+    winnerTeamId: "",
+    isTied: false,
+    overs: 1,
+    activeInningsIndex: nextInningsArr.length - 1,
+    innings: nextInningsArr,
+    updatedAt: new Date().toISOString()
+  };
+
+  writeList(
+    STORAGE_KEYS.MATCHES,
+    matches.map((m) => (m.id === matchId ? updatedMatch : m))
+  );
+  return updatedMatch;
+}
 
 export function declareMatchInnings(matchId) {
   const matches = getMatches();
@@ -760,15 +923,13 @@ export function declareMatchInnings(matchId) {
   const currentInn = match.innings[idx];
   if (!currentInn) return match;
 
-  const updatedInn = {
-    ...currentInn,
-    declared: true,
-    declaredRuns: Number(currentInn.runs || 0)
-  };
-
   const updatedMatch = {
     ...match,
-    innings: match.innings.map((item, i) => (i === idx ? updatedInn : item)),
+    innings: match.innings.map((item, i) =>
+      i === idx
+        ? { ...item, declared: true, declaredRuns: Number(item.runs || 0) }
+        : item
+    ),
     updatedAt: new Date().toISOString()
   };
 
@@ -804,7 +965,12 @@ export function startNextInnings(matchId) {
   const prevInn = match.innings[currentIdx];
   const nextBattingId = prevInn?.bowlingTeamId || match.teamBId;
   const nextBowlingId = prevInn?.battingTeamId || match.teamAId;
-  const nextInn = createEmptyInnings(nextNumber, nextBattingId, nextBowlingId);
+  const nextInn = createEmptyInnings(
+    nextNumber,
+    nextBattingId,
+    nextBowlingId,
+    false
+  );
 
   const updatedMatch = {
     ...match,
@@ -833,17 +999,32 @@ export function setActiveBattersAndBowler(
   const currentInn = match.innings[idx];
   if (!currentInn) return match;
 
-  const updatedInn = {
-    ...currentInn,
-    strikerId: strikerId !== undefined ? strikerId : currentInn.strikerId,
-    nonStrikerId:
-      nonStrikerId !== undefined ? nonStrikerId : currentInn.nonStrikerId,
-    bowlerId: bowlerId !== undefined ? bowlerId : currentInn.bowlerId
-  };
+  const outSet = new Set(currentInn.outPlayerIds || []);
+  const safeStriker =
+    strikerId !== undefined
+      ? outSet.has(strikerId)
+        ? ""
+        : strikerId
+      : currentInn.strikerId;
+  const safeNonStriker =
+    nonStrikerId !== undefined
+      ? outSet.has(nonStrikerId)
+        ? ""
+        : nonStrikerId
+      : currentInn.nonStrikerId;
 
   const updatedMatch = {
     ...match,
-    innings: match.innings.map((item, i) => (i === idx ? updatedInn : item)),
+    innings: match.innings.map((item, i) =>
+      i === idx
+        ? {
+            ...item,
+            strikerId: safeStriker,
+            nonStrikerId: safeNonStriker,
+            bowlerId: bowlerId !== undefined ? bowlerId : item.bowlerId
+          }
+        : item
+    ),
     updatedAt: new Date().toISOString()
   };
 
@@ -869,17 +1050,9 @@ export function swapOnFieldStrikers(matchId) {
     bowlerId: currentInn.bowlerId
   });
 }
+// === SECTION 07: BONUS RUNS, SUPER OVER & INNINGS FLOW END ===
 
-export function formatOversFromBalls(legalBalls, ballsPerOver = 6) {
-  const bpo = Math.max(1, Number(ballsPerOver || 6));
-  const balls = Math.max(0, Number(legalBalls || 0));
-  const completedOvers = Math.floor(balls / bpo);
-  const remBalls = balls % bpo;
-  return `${completedOvers}.${remBalls}`;
-}
-// === SECTION: FIXTURE, TOSS & BALL-BY-BALL ENGINE END ===
-
-// === SECTION: POINTS TABLE, NRR & TOURNAMENT STATS START ===
+// === SECTION 08: GROUP POINTS TABLE & NRR ENGINE START ===
 function ballsToDecimalOvers(legalBalls, ballsPerOver = 6) {
   const bpo = Math.max(1, Number(ballsPerOver || 6));
   return Math.max(0, Number(legalBalls || 0)) / bpo;
@@ -888,16 +1061,23 @@ function ballsToDecimalOvers(legalBalls, ballsPerOver = 6) {
 export function computeGroupPointsTable(tournament, matches, teams) {
   if (!tournament) return {};
 
-  const ptsWin = Number(tournament.pointsConfig?.win ?? 2);
-  const ptsTie = Number(tournament.pointsConfig?.tie ?? 1);
-  const ptsNr = Number(tournament.pointsConfig?.noResult ?? 1);
-  const ptsLoss = Number(tournament.pointsConfig?.loss ?? 0);
-
   const groups = Array.isArray(tournament.groups) ? tournament.groups : [];
   const teamMap = Object.fromEntries((teams || []).map((t) => [t.id, t]));
   const resultByGroup = {};
 
   groups.forEach((groupName) => {
+    const grpCfg = tournament.groupPointsConfig?.[groupName] || {};
+    const ptsWin = Number(
+      grpCfg.winPoints ?? tournament.pointsConfig?.win ?? 2
+    );
+    const ptsTie = Number(
+      grpCfg.tiePoints ?? tournament.pointsConfig?.tie ?? 1
+    );
+    const ptsNr = Number(tournament.pointsConfig?.noResult ?? 1);
+    const ptsLoss = Number(
+      grpCfg.lossPoints ?? tournament.pointsConfig?.loss ?? 0
+    );
+
     const groupTeamIds = Array.isArray(tournament.groupTeams?.[groupName])
       ? tournament.groupTeams[groupName]
       : [];
@@ -1027,7 +1207,9 @@ export function computeGroupPointsTable(tournament, matches, teams) {
 
   return resultByGroup;
 }
+// === SECTION 08: GROUP POINTS TABLE & NRR ENGINE END ===
 
+// === SECTION 09: TOURNAMENT PLAYER STATS START ===
 export function computeTournamentStats(tournamentId, matches, players) {
   const trnMatches = (matches || []).filter(
     (m) => m.tournamentId === tournamentId
@@ -1076,5 +1258,4 @@ export function computeTournamentStats(tournamentId, matches, players) {
 
   return { topBatters, topBowlers };
 }
-// === SECTION: POINTS TABLE, NRR & TOURNAMENT STATS END ===
-
+// === SECTION 09: TOURNAMENT PLAYER STATS END ===

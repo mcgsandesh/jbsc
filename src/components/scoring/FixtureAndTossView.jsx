@@ -30,6 +30,8 @@ const PRESET_OVERS = [4, 5, 6, 8, 10, 15, 20];
 const PRESET_BALLS_PER_OVER = [4, 5, 6, 8];
 const PRESET_PLAYERS_PER_SIDE = [8, 9, 10, 11];
 
+// === SECTION 01: TEAM LOGO BADGE HELPER (LOGO OR INITIALS FALLBACK) START ===
+// संघाचा लोगो असल्यास गोल बॅजमध्ये दाखवते; नसल्यास नावाची पहिली २ अक्षरे दाखवते
 function renderTeamLogoBadge(team, sizeClass = "w-11 h-11", textClass = "text-xs") {
   if (team?.logoUrl) {
     return (
@@ -49,6 +51,22 @@ function renderTeamLogoBadge(team, sizeClass = "w-11 h-11", textClass = "text-xs
     </div>
   );
 }
+// === SECTION 01: TEAM LOGO BADGE HELPER (LOGO OR INITIALS FALLBACK) END ===
+
+// === SECTION 02: MATCH SERIAL NUMBER HELPER (Match 1, Match 2...) START ===
+// प्रत्येक सामन्याचा सिरीअल नंबर (1, 2, 3...) काढतो जेणेकरून UI व पुढे लागणाऱ्या लॉजिकमध्ये क्रम अचूक राहतो
+function getMatchSerialNumber(matchObj, allMatches = []) {
+  if (!matchObj) return 1;
+  const savedNum = Number(matchObj.matchNumber ?? matchObj.matchNo ?? 0);
+  if (savedNum > 0) return savedNum;
+
+  const sameTourney = (Array.isArray(allMatches) ? allMatches : []).filter(
+    (m) => m && (m.tournamentId || "") === (matchObj.tournamentId || "")
+  );
+  const idx = sameTourney.findIndex((m) => m.id === matchObj.id);
+  return idx >= 0 ? idx + 1 : 1;
+}
+// === SECTION 02: MATCH SERIAL NUMBER HELPER (Match 1, Match 2...) END ===
 
 export default function FixtureAndTossView({
   tournamentId = "",
@@ -56,7 +74,8 @@ export default function FixtureAndTossView({
   onOpenTeamOverview,
   onStartScoring
 }) {
-  // === SECTION: COMPONENT STATE START ===
+  // === SECTION 03: COMPONENT STATE (VIEWS, FORM, TOSS & COIN) START ===
+  // सर्व सब-व्ह्यूज, फॉर्म फील्ड्स, टॉस निर्णय आणि नाणेफेक स्टेट येथे ठेवले आहेत
   const [tournaments, setTournaments] = useState([]);
   const [activeTournamentId, setActiveTournamentId] = useState(tournamentId);
   const [teams, setTeams] = useState([]);
@@ -66,6 +85,7 @@ export default function FixtureAndTossView({
   const [subView, setSubView] = useState("list");
   const [editingMatchId, setEditingMatchId] = useState("");
   const [tossMatchId, setTossMatchId] = useState("");
+  const [pendingDeleteMatchId, setPendingDeleteMatchId] = useState("");
 
   // Step 1 inside New Match: "points_table" (Group Match) | "other" (Other Matches)
   const [matchCategory, setMatchCategory] = useState("points_table");
@@ -90,9 +110,10 @@ export default function FixtureAndTossView({
   const [tossDecision, setTossDecision] = useState("bat"); // "bat" | "bowl"
   const [coinSide, setCoinSide] = useState(""); // "" | "HEAD" | "TAIL"
   const [isFlippingCoin, setIsFlippingCoin] = useState(false);
-  // === SECTION: COMPONENT STATE END ===
+  // === SECTION 03: COMPONENT STATE (VIEWS, FORM, TOSS & COIN) END ===
 
-  // === SECTION: DATA LOAD & DERIVED VALUES START ===
+  // === SECTION 04: DATA LOADING & DERIVED MEMOS START ===
+  // localStorage मधून स्पर्धा, संघ व सामने लोड करून फिल्टर केलेली यादी आणि मॅप्स तयार करते
   const reloadAll = () => {
     const trnList = getTournaments();
     const tmList = getTeams();
@@ -152,9 +173,10 @@ export default function FixtureAndTossView({
     () => Object.fromEntries(teams.map((t) => [t.id, t])),
     [teams]
   );
-  // === SECTION: DATA LOAD & DERIVED VALUES END ===
+  // === SECTION 04: DATA LOADING & DERIVED MEMOS END ===
 
-  // === SECTION: GROUP SETUP, EDIT & TEAM SELECTION HANDLERS START ===
+  // === SECTION 05: GROUP SETUP, EDIT & TEAM SLOT HANDLERS START ===
+  // नवीन ग्रुप तयार करणे, ग्रुपमध्ये संघ जोडणे, शेड्यूल मॅच एडिट करणे व समान संघ टाळणे
   const handleCreateGroup = () => {
     if (!activeTournament || !newGroupName.trim()) {
       showError("ग्रुप नाव आवश्यक", "कृपया नवीन ग्रुप नाव लिहा (उदा. Group C).");
@@ -252,9 +274,10 @@ export default function FixtureAndTossView({
       setSubView("form");
     }
   };
-  // === SECTION: GROUP SETUP, EDIT & TEAM SELECTION HANDLERS END ===
+  // === SECTION 05: GROUP SETUP, EDIT & TEAM SLOT HANDLERS END ===
 
-  // === SECTION: COIN FLIP, TOSS & SCORING HANDLERS START ===
+  // === SECTION 06: COIN FLIP, PERSIST, TOSS & DELETE HANDLERS START ===
+  // नाणेफेक, सामना सेव्ह करणे (Match 1, Match 2 नंबरसह), टॉस लागू करणे व सामना डिलिट करणे
   const openTossSubView = (matchObj) => {
     setTossMatchId(matchObj.id);
     setTossWonByTeamId(matchObj.toss?.wonByTeamId || matchObj.teamAId || "");
@@ -297,6 +320,7 @@ export default function FixtureAndTossView({
 
     const saved = saveMatchFixture({
       id: editingMatchId || undefined,
+      matchNumber: existingMatch?.matchNumber,
       tournamentId: activeTournament?.id || "",
       tournamentName: activeTournament?.name || "Standalone Match",
       season: autoSeason,
@@ -363,14 +387,20 @@ export default function FixtureAndTossView({
     }
   };
 
-  const handleDeleteMatch = (matchId) => {
-    deleteMatch(matchId);
-    reloadAll();
-    showSuccess("डिलीट झाले", "सामन्याची नोंद काढून टाकली आहे.");
+  const handleRequestDeleteMatch = (matchId) => {
+    setPendingDeleteMatchId(matchId);
   };
-  // === SECTION: COIN FLIP, TOSS & SCORING HANDLERS END ===
 
-  // === SECTION: SUB-VIEW TEAM PICKER START ===
+  const handleConfirmDeleteMatch = (matchId) => {
+    deleteMatch(matchId);
+    setPendingDeleteMatchId("");
+    reloadAll();
+    showSuccess("डिलीट झाले", "सामन्याची नोंद कायमची काढून टाकली आहे.");
+  };
+  // === SECTION 06: COIN FLIP, PERSIST, TOSS & DELETE HANDLERS END ===
+
+  // === SECTION 07: SUB-VIEW TEAM 1 / TEAM 2 PICKER START ===
+  // सामन्यासाठी Team 1 किंवा Team 2 निवडण्याची यादी
   if (subView === "pick_team_a" || subView === "pick_team_b") {
     const isSlotA = subView === "pick_team_a";
     const forbiddenId = isSlotA ? teamBId : teamAId;
@@ -445,12 +475,14 @@ export default function FixtureAndTossView({
       </div>
     );
   }
-  // === SECTION: SUB-VIEW TEAM PICKER END ===
+  // === SECTION 07: SUB-VIEW TEAM 1 / TEAM 2 PICKER END ===
 
-  // === SECTION: SUB-VIEW DIGITAL TOSS + COIN FLIP START ===
+  // === SECTION 08: SUB-VIEW DIGITAL TOSS & COIN FLIP START ===
+  // दोन्ही संघांचे लोगो, पर्यायी नाणेफेक, Toss विजेता आणि Bat/Bowl निवडून स्कोअरिंग सुरू करणे
   if (subView === "toss" && tossMatch) {
     const tA = teamMap[tossMatch.teamAId];
     const tB = teamMap[tossMatch.teamBId];
+    const tossMatchNo = getMatchSerialNumber(tossMatch, matches);
 
     return (
       <div className="space-y-3.5 text-white">
@@ -458,7 +490,7 @@ export default function FixtureAndTossView({
           <div className="flex items-center gap-2">
             <Coins className="w-4 h-4 text-amber-400" />
             <h2 className="text-sm sm:text-base font-black">
-              Toss • {tossMatch.matchTitle}
+              Toss • Match {tossMatchNo} ({tossMatch.matchTitle})
             </h2>
           </div>
 
@@ -476,7 +508,6 @@ export default function FixtureAndTossView({
           onSubmit={handleStartScoringFromToss}
           className="bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-800 space-y-4"
         >
-          {/* Teams Logos + Names Side-by-Side */}
           <div className="bg-slate-950/80 p-3.5 rounded-2xl border border-slate-800 space-y-2">
             <div className="flex items-center justify-between gap-2">
               <div className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
@@ -499,7 +530,7 @@ export default function FixtureAndTossView({
             </div>
 
             <div className="text-center text-[11px] text-slate-400 pt-1 border-t border-slate-800/80">
-              {tossMatch.tournamentName} •{" "}
+              Match {tossMatchNo} • {tossMatch.tournamentName} •{" "}
               {tossMatch.format === MATCH_FORMATS.TEST
                 ? "Test"
                 : `${tossMatch.overs} Ov`}{" "}
@@ -507,7 +538,6 @@ export default function FixtureAndTossView({
             </div>
           </div>
 
-          {/* Optional Digital Coin Flip (Head / Tail) */}
           <div className="bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800 flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               <div
@@ -539,7 +569,6 @@ export default function FixtureAndTossView({
             </button>
           </div>
 
-          {/* 1. Toss Winner (With Team Logo + Name) */}
           <div className="space-y-2">
             <label className="block text-xs font-black text-slate-200">
               १. Toss कोणी जिंकला? *
@@ -568,7 +597,6 @@ export default function FixtureAndTossView({
             </div>
           </div>
 
-          {/* 2. Bat or Bowl */}
           <div className="space-y-2">
             <label className="block text-xs font-black text-slate-200">
               २. काय निवडले? *
@@ -599,7 +627,6 @@ export default function FixtureAndTossView({
             </div>
           </div>
 
-          {/* Start Scoring CTA */}
           <button
             type="submit"
             className="w-full py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs sm:text-sm font-black cursor-pointer flex items-center justify-center gap-2"
@@ -611,9 +638,10 @@ export default function FixtureAndTossView({
       </div>
     );
   }
-  // === SECTION: SUB-VIEW DIGITAL TOSS + COIN FLIP END ===
+  // === SECTION 08: SUB-VIEW DIGITAL TOSS & COIN FLIP END ===
 
-  // === SECTION: SUB-VIEW NEW / EDIT SCHEDULED MATCH START ===
+  // === SECTION 09: SUB-VIEW NEW / EDIT SCHEDULED MATCH FORM START ===
+  // नवीन सामना तयार करणे किंवा शेड्यूल सामना एडिट करणे (ग्रुप, संघ, ठिकाण, वेळ, ओव्हर्स व खेळाडू)
   if (subView === "form") {
     const teamA = teamMap[teamAId] || null;
     const teamB = teamMap[teamBId] || null;
@@ -627,13 +655,22 @@ export default function FixtureAndTossView({
     const readyForTeamAndMatchDetails =
       matchCategory === "other" ? Boolean(matchTitle) : Boolean(groupName);
 
+    const editingMatchObj = editingMatchId
+      ? matches.find((m) => m.id === editingMatchId)
+      : null;
+    const previewMatchNo = editingMatchObj
+      ? getMatchSerialNumber(editingMatchObj, matches)
+      : tournamentMatches.length + 1;
+
     return (
       <div className="space-y-3.5 text-white">
         <div className="flex items-center justify-between bg-slate-900 px-4 py-3 rounded-2xl border border-slate-800">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-amber-400" />
             <h2 className="text-sm sm:text-base font-black">
-              {editingMatchId ? "सामना एडिट करा" : "नवीन सामना"}
+              {editingMatchId
+                ? `सामना एडिट करा • Match ${previewMatchNo}`
+                : `नवीन सामना • Match ${previewMatchNo}`}
             </h2>
           </div>
 
@@ -650,6 +687,7 @@ export default function FixtureAndTossView({
         <form className="bg-slate-900 rounded-2xl p-4 sm:p-5 border border-slate-800 space-y-4">
           <div className="bg-slate-950 px-3.5 py-2.5 rounded-xl border border-slate-800 flex items-center justify-between gap-2 text-xs">
             <span className="font-bold text-slate-200 truncate">
+              Match {previewMatchNo} •{" "}
               {activeTournament?.name || "Standalone"} •{" "}
               {tournamentFormat === MATCH_FORMATS.TEST ? "Test" : "One Day"}
             </span>
@@ -658,7 +696,6 @@ export default function FixtureAndTossView({
             </span>
           </div>
 
-          {/* Step 1: Points Table vs Other Matches */}
           <div className="space-y-2.5 bg-slate-950/70 p-3.5 rounded-2xl border border-slate-800">
             <div className="text-xs font-black text-amber-300">
               १. सामना प्रकार निवडा
@@ -1015,9 +1052,10 @@ export default function FixtureAndTossView({
       </div>
     );
   }
-  // === SECTION: SUB-VIEW NEW / EDIT SCHEDULED MATCH END ===
+  // === SECTION 09: SUB-VIEW NEW / EDIT SCHEDULED MATCH FORM END ===
 
-  // === SECTION: MAIN FIXTURE LIST VIEW START ===
+  // === SECTION 10: MAIN FIXTURE LIST HEADER & TOURNAMENT SWITCHER START ===
+  // वरचा हेडिंग बार, New Match बटण आणि स्पर्धा निवडण्याचा ड्रॉपडाऊन
   return (
     <div className="space-y-3.5 text-white">
       <div className="bg-slate-900 p-3 sm:p-4 rounded-2xl border border-slate-800 space-y-2.5">
@@ -1065,16 +1103,22 @@ export default function FixtureAndTossView({
           </select>
         )}
       </div>
+      {/* === SECTION 10: MAIN FIXTURE LIST HEADER & TOURNAMENT SWITCHER END === */}
 
+      {/* === SECTION 11: MATCH CARDS LIST (Match 1, Match 2 BADGE & ACTIONS) START === */}
+      {/* प्रत्येक सामन्याचा Match 1, Match 2 क्रमांक, ग्रुप/टायटल, संघ, स्कोअर आणि अॅक्शन बटणे */}
       <div className="space-y-2.5">
         {tournamentMatches.length > 0 ? (
           tournamentMatches.map((m) => {
             const tA = teamMap[m.teamAId];
             const tB = teamMap[m.teamBId];
+            const matchNo = getMatchSerialNumber(m, matches);
             const currentInn =
               m.innings?.[m.activeInningsIndex || 0] || m.innings?.[0];
             const isScheduled = m.status === "scheduled";
             const isLive = m.status === "live";
+            const isFinished = m.status === "completed";
+            const isConfirmingDelete = pendingDeleteMatchId === m.id;
             const dateTimeLabel = [m.date, m.time].filter(Boolean).join(" • ");
 
             return (
@@ -1083,10 +1127,15 @@ export default function FixtureAndTossView({
                 className="bg-slate-900 rounded-2xl p-3.5 border border-slate-800 space-y-2.5"
               >
                 <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-[11px] font-bold text-slate-300 truncate">
-                      {m.groupName ? `${m.groupName} • ` : ""}
-                      {m.matchTitle}
+                  <div className="min-w-0 space-y-0.5">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="px-2 py-0.5 rounded bg-amber-400/15 text-amber-300 border border-amber-400/30 text-[10px] font-black">
+                        Match {matchNo}
+                      </span>
+                      <span className="text-[11px] font-bold text-slate-300 truncate">
+                        {m.groupName ? `${m.groupName} • ` : ""}
+                        {m.matchTitle}
+                      </span>
                     </div>
                     <div className="text-[10px] text-slate-400 truncate">
                       {dateTimeLabel || "Date TBA"}
@@ -1099,15 +1148,15 @@ export default function FixtureAndTossView({
                       className={`inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                         isLive
                           ? "bg-amber-400 text-slate-950"
-                          : m.status === "completed"
-                          ? "bg-slate-800 text-slate-300"
+                          : isFinished
+                          ? "bg-emerald-500/20 text-emerald-300 border border-emerald-500/40"
                           : "bg-slate-800 text-amber-300"
                       }`}
                     >
                       {isLive
                         ? "Live"
-                        : m.status === "completed"
-                        ? "Completed"
+                        : isFinished
+                        ? "Finished"
                         : "Scheduled"}
                     </span>
                     {currentInn && !isScheduled && (
@@ -1123,7 +1172,6 @@ export default function FixtureAndTossView({
                   </div>
                 </div>
 
-                {/* Teams Row (Click logo/name -> Team Overview) */}
                 <div className="space-y-1.5 pt-0.5">
                   {[tA, tB].map((tm, idx) => (
                     <div
@@ -1144,15 +1192,38 @@ export default function FixtureAndTossView({
                   ))}
                 </div>
 
+                {isConfirmingDelete && (
+                  <div className="bg-rose-950/80 border border-rose-500/50 rounded-xl p-2.5 flex items-center justify-between gap-2 text-xs">
+                    <span className="font-black text-rose-200">
+                      हा सामना कायमचा Delete करायचा का? डेटा जाईल!
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setPendingDeleteMatchId("")}
+                        className="px-2.5 py-1 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold cursor-pointer"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleConfirmDeleteMatch(m.id)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-500 text-white font-black cursor-pointer"
+                      >
+                        Confirm Delete
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
                   <span className="text-[10px] font-bold text-slate-400 truncate">
-                    {activeTournament?.club || "JBSC"} •{" "}
+                    Match {matchNo} • {activeTournament?.club || "JBSC"} •{" "}
                     {m.format === MATCH_FORMATS.TEST ? "Test" : `${m.overs} Ov`}{" "}
                     • {m.playersPerSide}P
                   </span>
 
                   <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Scheduled असेपर्यंतच Edit बटण */}
                     {isScheduled && (
                       <button
                         type="button"
@@ -1165,14 +1236,23 @@ export default function FixtureAndTossView({
                       </button>
                     )}
 
-                    {isLive || m.status === "completed" ? (
+                    {isFinished ? (
+                      <button
+                        type="button"
+                        onClick={() => onStartScoring && onStartScoring(m.id)}
+                        className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-300 border border-slate-700 text-xs font-black cursor-pointer"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Scorecard</span>
+                      </button>
+                    ) : isLive ? (
                       <button
                         type="button"
                         onClick={() => onStartScoring && onStartScoring(m.id)}
                         className="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-black cursor-pointer"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5" />
-                        <span>{isLive ? "Scoring" : "Scorecard"}</span>
+                        <span>Scoring</span>
                       </button>
                     ) : (
                       <button
@@ -1187,7 +1267,7 @@ export default function FixtureAndTossView({
 
                     <button
                       type="button"
-                      onClick={() => handleDeleteMatch(m.id)}
+                      onClick={() => handleRequestDeleteMatch(m.id)}
                       className="p-1.5 rounded-xl text-slate-400 hover:text-rose-400 hover:bg-slate-800 cursor-pointer"
                       title="Delete Match"
                     >
@@ -1199,12 +1279,15 @@ export default function FixtureAndTossView({
             );
           })
         ) : (
+          // === SECTION 12: EMPTY FIXTURES STATE START ===
+          // स्पर्धेत अद्याप कोणताही सामना नसल्यास दिसणारा रिक्त संदेश बॉक्स
           <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 text-center text-xs text-slate-400">
             या स्पर्धेसाठी अद्याप कोणताही सामना तयार केलेला नाही. &ldquo;New Match&rdquo; वर क्लिक करा.
           </div>
+          // === SECTION 12: EMPTY FIXTURES STATE END ===
         )}
       </div>
+      {/* === SECTION 11: MATCH CARDS LIST (Match 1, Match 2 BADGE & ACTIONS) END === */}
     </div>
   );
-  // === SECTION: MAIN FIXTURE LIST VIEW END ===
 }
